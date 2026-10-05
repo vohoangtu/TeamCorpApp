@@ -49,6 +49,23 @@ export const AddProjectModal: React.FC = () => {
       .catch(() => {});
   }, []);
 
+  const handleClose = () => {
+    setIsAddModalOpen(false);
+    setError(null);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isAddModalOpen && !isBrowserModalOpen) {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAddModalOpen, isBrowserModalOpen]);
+
+  if (!isAddModalOpen) return null;
+
   // Auto-fill defaults when changing source path
   const handlePathChange = async (path: string) => {
     setSourcePath(path);
@@ -145,7 +162,12 @@ export const AddProjectModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-md animate-fade-in transition-colors">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-md animate-fade-in transition-colors cursor-default"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
+    >
       <div className="relative w-full max-w-2xl rounded-xl border border-hub bg-hub-card shadow-2xl p-6 overflow-hidden transition-colors">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-hub">
@@ -159,8 +181,10 @@ export const AddProjectModal: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={() => setIsAddModalOpen(false)}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 transition-all"
+            type="button"
+            onClick={handleClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 transition-all cursor-pointer"
+            title="Đóng cửa sổ (Esc)"
           >
             <X className="h-5 w-5" />
           </button>
@@ -445,10 +469,10 @@ export const AddProjectModal: React.FC = () => {
           <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
             <button
               type="button"
-              onClick={() => setIsAddModalOpen(false)}
-              className="rounded-xl px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-all"
+              onClick={handleClose}
+              className="rounded-xl px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer"
             >
-              Cancel
+              Hủy bỏ (Cancel)
             </button>
             <button
               type="submit"
