@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Folder, 
@@ -6,9 +6,15 @@ import {
   Layers, 
   Sparkles, 
   Check, 
-  AlertCircle
+  AlertCircle,
+  FolderOpen,
+  FolderSearch,
+  FolderTree,
+  RotateCw,
+  CheckCircle2
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { FolderBrowserModal } from './FolderBrowserModal';
 import type { RuntimeType, SourceType } from '../types';
 
 export const AddProjectModal: React.FC = () => {
@@ -28,11 +34,25 @@ export const AddProjectModal: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!isAddModalOpen) return null;
+  // Folder Chooser state
+  const [isBrowserModalOpen, setIsBrowserModalOpen] = useState(false);
+  const [isBrowsingNative, setIsBrowsingNative] = useState(false);
+  const [bookmarks, setBookmarks] = useState<Array<{ label: string; path: string; icon: string }>>([]);
+  const [detectedFramework, setDetectedFramework] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/system/list-directories')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.bookmarks) setBookmarks(data.bookmarks);
+      })
+      .catch(() => {});
+  }, []);
 
   // Auto-fill defaults when changing source path
   const handlePathChange = async (path: string) => {
     setSourcePath(path);
+    setDetectedFramework(null);
     if (!path) return;
 
     // Extract folder name as project name
@@ -55,9 +75,30 @@ export const AddProjectModal: React.FC = () => {
         if (detected.runCommand) setRunCommand(detected.runCommand);
         if (detected.buildCommand) setBuildCommand(detected.buildCommand);
         if (detected.port) setPort(detected.port);
+        if (detected.framework) setDetectedFramework(detected.framework);
       }
     } catch {
       // ignore
+    }
+  };
+
+  // Launch native Windows Explorer folder picker dialog
+  const handleNativeBrowse = async () => {
+    setIsBrowsingNative(true);
+    try {
+      const res = await fetch('/api/system/browse-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initialPath: sourcePath }),
+      });
+      const data = await res.json();
+      if (data.success && data.path) {
+        handlePathChange(data.path);
+      }
+    } catch (e) {
+      console.error('Failed to open native folder chooser', e);
+    } finally {
+      setIsBrowsingNative(false);
     }
   };
 
@@ -167,22 +208,90 @@ export const AddProjectModal: React.FC = () => {
 
           {/* Source inputs */}
           {sourceType === 'local' ? (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Windows Folder Path:
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="e.g. C:\Users\vohoa\Projects\my-awesome-app"
-                  value={sourcePath}
-                  onChange={(e) => handlePathChange(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder-slate-600"
-                  required
-                />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Folder className="h-3.5 w-3.5 text-sky-500" />
+                  <span>Thư mục Dự án Windows (Folder Path):</span>
+                </label>
+                {detectedFramework && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[11px] font-semibold border border-emerald-500/20 animate-in fade-in">
+                    <CheckCircle2 className="h-3 w-3" />
+                    <span>Đã nhận diện: {detectedFramework}</span>
+                  </span>
+                )}
               </div>
-              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                Thư mục chứa mã nguồn tính năng bạn đang phát triển trên Windows 11.
+
+              {/* Path Input + Native Windows Chooser Buttons */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Folder className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="VD: C:\Users\vohoa\Projects\my-app hoặc bấm Duyệt..."
+                    value={sourcePath}
+                    onChange={(e) => handlePathChange(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50 pl-9 pr-3 py-2 text-xs font-mono text-slate-900 placeholder-slate-400 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder-slate-600 transition-all shadow-xs"
+                    required
+                  />
+                </div>
+
+                {/* Primary Native Windows Explorer Chooser Button */}
+                <button
+                  type="button"
+                  onClick={handleNativeBrowse}
+                  disabled={isBrowsingNative}
+                  className="flex items-center gap-1.5 rounded-xl border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 px-3.5 py-2 text-xs font-semibold text-sky-600 dark:text-sky-400 transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
+                  title="Mở cửa sổ chọn thư mục chuẩn của Windows Explorer"
+                >
+                  {isBrowsingNative ? (
+                    <>
+                      <RotateCw className="h-3.5 w-3.5 animate-spin text-sky-500" />
+                      <span>Đang mở...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FolderSearch className="h-3.5 w-3.5 text-sky-500" />
+                      <span>Duyệt Thư Mục...</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Secondary In-App Explorer Chooser Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsBrowserModalOpen(true)}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-all shadow-2xs shrink-0 cursor-pointer"
+                  title="Duyệt nhanh cây thư mục máy tính"
+                >
+                  <FolderTree className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Cây thư mục</span>
+                </button>
+              </div>
+
+              {/* Quick Bookmark Chips */}
+              {bookmarks.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mr-0.5">
+                    <Sparkles className="h-3 w-3 text-amber-500" /> Nhanh:
+                  </span>
+                  {bookmarks.map((bm, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handlePathChange(bm.path)}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 text-[11px] text-slate-600 dark:text-slate-300 hover:border-sky-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors shadow-2xs"
+                      title={bm.path}
+                    >
+                      <span>{bm.icon}</span>
+                      <span>{bm.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Nhấp <strong>Duyệt Thư Mục...</strong> để chọn trực tiếp từ Windows Explorer hoặc nhấp các phím tắt nhanh.
               </p>
             </div>
           ) : (
@@ -361,6 +470,14 @@ export const AddProjectModal: React.FC = () => {
           </div>
         </form>
       </div>
+
+      {/* In-App Directory Explorer Modal */}
+      <FolderBrowserModal
+        isOpen={isBrowserModalOpen}
+        initialPath={sourcePath}
+        onSelect={(selectedPath) => handlePathChange(selectedPath)}
+        onClose={() => setIsBrowserModalOpen(false)}
+      />
     </div>
   );
 };

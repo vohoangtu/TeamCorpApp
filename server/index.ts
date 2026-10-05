@@ -23,6 +23,7 @@ import { wslDockerCommander } from './wsl-docker-commander';
 import { architectureGraphService } from './architecture-graph';
 import { dependencyDoctor } from './dependency-doctor';
 import { resourceMonitor } from './resource-monitor';
+import { folderChooserService } from './folder-chooser';
 import type { CreateProjectPayload, Project } from '../src/types';
 
 const PORT = 4100;
@@ -771,6 +772,23 @@ server.on('request', async (req, res) => {
       const summary = resourceMonitor.getSummary();
       res.writeHead(200);
       res.end(JSON.stringify(summary));
+      return;
+    }
+
+    // --- 📂 NATIVE WINDOWS FOLDER CHOOSER & DIRECTORY EXPLORER ---
+    if (method === 'POST' && pathname === '/api/system/browse-folder') {
+      const body = await parseBody<{ initialPath?: string }>(req);
+      const result = await folderChooserService.openNativeDialog(body.initialPath);
+      res.writeHead(200);
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (method === 'GET' && pathname === '/api/system/list-directories') {
+      const targetPath = parsedUrl.searchParams.get('path') || undefined;
+      const result = folderChooserService.listDirectory(targetPath);
+      res.writeHead(200);
+      res.end(JSON.stringify(result));
       return;
     }
 
