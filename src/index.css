@@ -1,0 +1,426 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root, [data-theme="fluent-dark"] {
+  --hub-bg: #202020;
+  --hub-card: #2B2B2B;
+  --hub-card-hover: #323232;
+  --hub-sidebar: #1E1E1E;
+  --hub-border: rgba(255, 255, 255, 0.08);
+  --hub-border-subtle: rgba(255, 255, 255, 0.04);
+  --hub-accent: #0F6CBD;
+  --hub-accent-hover: #115EA3;
+  --hub-accent-subtle: rgba(15, 108, 189, 0.18);
+  --hub-accent-text: #FFFFFF;
+  --hub-text: #FFFFFF;
+  --hub-text-secondary: #C8C8C8;
+  --hub-text-muted: #8A8A8A;
+}
+
+[data-theme="fluent-light"] {
+  --hub-bg: #F3F3F3;
+  --hub-card: #FFFFFF;
+  --hub-card-hover: #FAFAFA;
+  --hub-sidebar: #ECECEC;
+  --hub-border: rgba(0, 0, 0, 0.08);
+  --hub-border-subtle: rgba(0, 0, 0, 0.04);
+  --hub-accent: #0F6CBD;
+  --hub-accent-hover: #115EA3;
+  --hub-accent-subtle: rgba(15, 108, 189, 0.1);
+  --hub-accent-text: #FFFFFF;
+  --hub-text: #1E1E1E;
+  --hub-text-secondary: #5C5C5C;
+  --hub-text-muted: #8A8A8A;
+}
+
+[data-theme="tokyo-night"] {
+  --hub-bg: #1a1b26;
+  --hub-card: #24283b;
+  --hub-card-hover: #2f3549;
+  --hub-sidebar: #16161e;
+  --hub-border: rgba(65, 72, 104, 0.55);
+  --hub-border-subtle: rgba(65, 72, 104, 0.28);
+  --hub-accent: #7aa2f7;
+  --hub-accent-hover: #89b4fa;
+  --hub-accent-subtle: rgba(122, 162, 247, 0.18);
+  --hub-accent-text: #1a1b26;
+  --hub-text: #c0caf5;
+  --hub-text-secondary: #9aa5ce;
+  --hub-text-muted: #565f89;
+}
+
+[data-theme="catppuccin"] {
+  --hub-bg: #1e1e2e;
+  --hub-card: #313244;
+  --hub-card-hover: #45475a;
+  --hub-sidebar: #181825;
+  --hub-border: rgba(88, 91, 112, 0.55);
+  --hub-border-subtle: rgba(88, 91, 112, 0.28);
+  --hub-accent: #cba6f7;
+  --hub-accent-hover: #f5c2e7;
+  --hub-accent-subtle: rgba(203, 166, 247, 0.18);
+  --hub-accent-text: #11111b;
+  --hub-text: #cdd6f4;
+  --hub-text-secondary: #a6adc8;
+  --hub-text-muted: #6c7086;
+}
+
+[data-theme="dracula"] {
+  --hub-bg: #282a36;
+  --hub-card: #343746;
+  --hub-card-hover: #44475a;
+  --hub-sidebar: #21222c;
+  --hub-border: rgba(98, 114, 164, 0.55);
+  --hub-border-subtle: rgba(98, 114, 164, 0.28);
+  --hub-accent: #bd93f9;
+  --hub-accent-hover: #ff79c6;
+  --hub-accent-subtle: rgba(189, 147, 249, 0.18);
+  --hub-accent-text: #282a36;
+  --hub-text: #f8f8f2;
+  --hub-text-secondary: #d6d6e2;
+  --hub-text-muted: #6272a4;
+}
+
+[data-theme="github-dark"] {
+  --hub-bg: #22272e;
+  --hub-card: #2d333b;
+  --hub-card-hover: #373e47;
+  --hub-sidebar: #1c2128;
+  --hub-border: rgba(68, 76, 86, 0.65);
+  --hub-border-subtle: rgba(68, 76, 86, 0.32);
+  --hub-accent: #539bf5;
+  --hub-accent-hover: #6cb6ff;
+  --hub-accent-subtle: rgba(83, 155, 245, 0.18);
+  --hub-accent-text: #1c2128;
+  --hub-text: #adbac7;
+  --hub-text-secondary: #768390;
+  --hub-text-muted: #545d68;
+}
+
+@layer base {
+  * {
+    border-color: var(--hub-border, rgba(226, 232, 240, 0.8));
+  }
+  html, body {
+    font-size: 14px;
+    line-height: 20px;
+    font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--hub-bg);
+    color: var(--hub-text);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
+
+/* Dynamic theme utility classes */
+.bg-hub-canvas { background-color: var(--hub-bg) !important; }
+.bg-hub-card { background-color: var(--hub-card) !important; }
+.hover-bg-hub-card:hover { background-color: var(--hub-card-hover) !important; }
+.bg-hub-sidebar { background-color: var(--hub-sidebar) !important; }
+.border-hub { border-color: var(--hub-border) !important; }
+.border-hub-subtle { border-color: var(--hub-border-subtle) !important; }
+.text-hub-primary { color: var(--hub-text) !important; }
+.text-hub-secondary { color: var(--hub-text-secondary) !important; }
+.text-hub-muted { color: var(--hub-text-muted) !important; }
+.bg-hub-accent { background-color: var(--hub-accent) !important; color: var(--hub-accent-text) !important; }
+.hover-bg-hub-accent:hover { background-color: var(--hub-accent-hover) !important; }
+.bg-hub-accent-subtle { background-color: var(--hub-accent-subtle) !important; }
+.text-hub-accent { color: var(--hub-accent) !important; }
+.border-hub-accent { border-color: var(--hub-accent) !important; }
+
+/* Microsoft Fluent 2 Signature Controls */
+.fluent-card {
+  background-color: var(--hub-card);
+  border-radius: 8px;
+  border: 1px solid var(--hub-border);
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.04), 0px 0px 1px rgba(0, 0, 0, 0.12);
+  transition: all 0.15s ease;
+}
+.dark .fluent-card {
+  background-color: var(--hub-card);
+  border-radius: 8px;
+  border: 1px solid var(--hub-border);
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.24), 0px 0px 1px rgba(0, 0, 0, 0.4);
+}
+
+.fluent-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  background-color: var(--hub-accent);
+  color: var(--hub-accent-text);
+  border: 1px solid transparent;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.28);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.12);
+  transition: all 0.1s ease;
+  user-select: none;
+  cursor: pointer;
+}
+.fluent-btn-primary:hover {
+  filter: brightness(1.1);
+}
+.fluent-btn-primary:active {
+  transform: translateY(1px);
+  filter: brightness(0.95);
+  border-bottom-width: 1px;
+}
+
+.fluent-btn-standard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  background-color: var(--hub-card);
+  color: var(--hub-text);
+  border: 1px solid var(--hub-border);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.1s ease;
+  user-select: none;
+  cursor: pointer;
+}
+.dark .fluent-btn-standard {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.24);
+}
+.fluent-btn-standard:hover {
+  background-color: var(--hub-card-hover);
+}
+.fluent-btn-standard:active {
+  transform: translateY(1px);
+}
+
+/* Dedicated Fluent 2 Icon Button (Zero padding, perfectly centered) */
+.fluent-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  border-radius: 4px;
+  background-color: var(--hub-card);
+  color: var(--hub-text-secondary);
+  border: 1px solid var(--hub-border);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.1s ease;
+  user-select: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.dark .fluent-icon-btn {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.24);
+}
+.fluent-icon-btn:hover {
+  background-color: var(--hub-card-hover);
+  color: var(--hub-text);
+  border-color: var(--hub-border);
+}
+.fluent-icon-btn:active {
+  transform: translateY(1px);
+}
+
+/* Windows 11 Fluent Mica / Acrylic custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+
+/* =========================================================================
+   Microsoft Fluent 2 Materials Engine (Mica, Mica Alt, Acrylic, Solid)
+   ========================================================================= */
+
+/* 1. Mica Base (Default Windows 11 Dev Home style) */
+[data-material="mica"] {
+  background-image: radial-gradient(circle at 12% 8%, rgba(15, 108, 189, 0.04) 0%, transparent 50%);
+  background-attachment: fixed;
+}
+[data-material="mica"].dark {
+  background-image: radial-gradient(circle at 12% 8%, rgba(71, 158, 245, 0.05) 0%, transparent 50%);
+}
+
+/* 2. Mica Alt (High-contrast tabbed hierarchy as seen in File Explorer & Terminal) */
+[data-material="mica-alt"].dark {
+  --hub-sidebar: #171717 !important;
+  --hub-bg: #121212 !important;
+  --hub-card: #1f1f1f !important;
+  --hub-card-hover: #292929 !important;
+  --hub-border: rgba(255, 255, 255, 0.12) !important;
+}
+[data-material="mica-alt"]:not(.dark) {
+  --hub-sidebar: #E5E5E5 !important;
+  --hub-bg: #EAEAEA !important;
+  --hub-card: #FFFFFF !important;
+  --hub-card-hover: #F8F8F8 !important;
+  --hub-border: rgba(0, 0, 0, 0.14) !important;
+}
+[data-material="mica-alt"] .fluent-card {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.2) !important;
+}
+/* Mica Alt Buttons: High contrast, tactile bevel, prominent bottom edge */
+[data-material="mica-alt"] .fluent-btn-standard,
+[data-material="mica-alt"] .fluent-icon-btn {
+  background-color: var(--hub-card) !important;
+  border: 1px solid var(--hub-border) !important;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+}
+[data-material="mica-alt"].dark .fluent-btn-standard,
+[data-material="mica-alt"].dark .fluent-icon-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.65) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+[data-material="mica-alt"] .fluent-btn-standard:hover,
+[data-material="mica-alt"] .fluent-icon-btn:hover {
+  background-color: var(--hub-card-hover) !important;
+  border-color: var(--hub-accent) !important;
+}
+[data-material="mica-alt"] .fluent-btn-primary {
+  border: 1px solid transparent !important;
+  border-bottom: 3px solid rgba(0, 0, 0, 0.45) !important;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.25) !important;
+}
+[data-material="mica-alt"] .fluent-btn-primary:active {
+  border-bottom-width: 1px !important;
+}
+
+/* 3. Acrylic Glass (Frosted Translucent Blur with Specular Highlights) */
+[data-material="acrylic"] {
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(15, 108, 189, 0.12) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(236, 72, 153, 0.08) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+[data-material="acrylic"] .bg-hub-sidebar {
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  background-color: color-mix(in srgb, var(--hub-sidebar) 75%, transparent) !important;
+}
+[data-material="acrylic"] header {
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  background-color: color-mix(in srgb, var(--hub-sidebar) 80%, transparent) !important;
+}
+[data-material="acrylic"] .fluent-card {
+  backdrop-filter: blur(20px) saturate(190%) !important;
+  background-color: color-mix(in srgb, var(--hub-card) 78%, transparent) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+[data-material="acrylic"].dark .fluent-card {
+  border-top: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Acrylic Buttons: Translucent frosted glass tile with specular top reflection */
+[data-material="acrylic"] .fluent-btn-standard,
+[data-material="acrylic"] .fluent-icon-btn {
+  background-color: color-mix(in srgb, var(--hub-card) 55%, transparent) !important;
+  backdrop-filter: blur(14px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.42) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+[data-material="acrylic"].dark .fluent-btn-standard,
+[data-material="acrylic"].dark .fluent-icon-btn {
+  background-color: color-mix(in srgb, var(--hub-card) 50%, transparent) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+[data-material="acrylic"] .fluent-btn-standard:hover,
+[data-material="acrylic"] .fluent-icon-btn:hover {
+  background-color: color-mix(in srgb, var(--hub-card) 75%, transparent) !important;
+  border-top-color: rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+[data-material="acrylic"] .fluent-btn-primary {
+  backdrop-filter: blur(12px) !important;
+  background-color: color-mix(in srgb, var(--hub-accent) 88%, transparent) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.55) !important;
+  box-shadow: 0 4px 16px var(--hub-accent-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+}
+[data-material="acrylic"] .fluent-btn-primary:hover {
+  background-color: var(--hub-accent-hover) !important;
+  box-shadow: 0 6px 20px var(--hub-accent-subtle), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+}
+/* Acrylic Inputs */
+[data-material="acrylic"] input[type="text"] {
+  backdrop-filter: blur(14px) saturate(160%) !important;
+  background-color: color-mix(in srgb, var(--hub-card) 60%, transparent) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+/* 4. Solid Flat (Pure Solid Layers, Zero Blur, Maximum Sharpness & Battery Efficiency) */
+[data-material="solid"] {
+  background-image: none !important;
+}
+[data-material="solid"] * {
+  backdrop-filter: none !important;
+}
+[data-material="solid"] .fluent-card {
+  box-shadow: none !important;
+  border: 1px solid var(--hub-border) !important;
+}
+/* Solid Flat Buttons: Matte, flat, zero shadow, zero gradient */
+[data-material="solid"] .fluent-btn-standard,
+[data-material="solid"] .fluent-icon-btn,
+[data-material="solid"] .fluent-btn-primary {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+}
+[data-material="solid"] .fluent-btn-standard,
+[data-material="solid"] .fluent-icon-btn {
+  background-color: var(--hub-card) !important;
+  border: 1px solid var(--hub-border) !important;
+  border-bottom: 1px solid var(--hub-border) !important;
+}
+[data-material="solid"] .fluent-btn-standard:hover,
+[data-material="solid"] .fluent-icon-btn:hover {
+  background-color: var(--hub-card-hover) !important;
+  border-color: var(--hub-accent) !important;
+}
+[data-material="solid"] .fluent-btn-primary {
+  background-color: var(--hub-accent) !important;
+  border: 1px solid var(--hub-accent) !important;
+  border-bottom: 1px solid var(--hub-accent) !important;
+}
+[data-material="solid"] .fluent-btn-primary:hover {
+  background-color: var(--hub-accent-hover) !important;
+}
+[data-material="solid"] .fluent-btn-primary:active,
+[data-material="solid"] .fluent-btn-standard:active,
+[data-material="solid"] .fluent-icon-btn:active {
+  transform: none !important;
+  opacity: 0.85 !important;
+}
+
+

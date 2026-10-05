@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='20' height='14' x='2' y='3' rx='2'/><line x1='8' x2='16' y1='21' y2='21'/><line x1='12' x2='12' y1='17' y2='21'/></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WinDev Hub - Windows 11 App Lifecycle & Hot-Sync</title>
+    <!-- Windows 11 Native Typography & Cascadia Code -->
+    <script>
+      (function() {
+        const themeMap = {
+          'fluent-light': { isDark: false },
+          'fluent-dark': { isDark: true },
+          'tokyo-night': { isDark: true },
+          'catppuccin': { isDark: true },
+          'dracula': { isDark: true },
+          'github-dark': { isDark: true }
+        };
+        let themeId = localStorage.getItem('windev-theme-id');
+        if (!themeId || !themeMap[themeId]) {
+          const old = localStorage.getItem('windev-theme');
+          themeId = old === 'light' ? 'fluent-light' : 'fluent-dark';
+        }
+        document.documentElement.setAttribute('data-theme', themeId);
+        if (themeMap[themeId].isDark) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      })();
+    </script>
+  </head>
+  <body class="bg-hub-canvas text-hub-primary antialiased font-['Segoe_UI_Variable_Text','Segoe_UI',-apple-system,BlinkMacSystemFont,sans-serif] selection:bg-[#0F6CBD]/20 selection:text-[#0F6CBD] dark:selection:text-[#479EF5] transition-colors duration-150">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
