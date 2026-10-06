@@ -23,6 +23,9 @@ import { DockerFleetModal } from './components/DockerFleetModal';
 import { ArchitectureGraphModal } from './components/ArchitectureGraphModal';
 import { DependencyDoctorModal } from './components/DependencyDoctorModal';
 import { AppResourceInspectorModal } from './components/AppResourceInspectorModal';
+import { UnifiedLogAggregatorModal } from './components/UnifiedLogAggregatorModal';
+import { GitMatrixModal } from './components/GitMatrixModal';
+import { WindowsPerformanceModal } from './components/WindowsPerformanceModal';
 import { SyncStudioView } from './components/SyncStudioView';
 import { DockerView } from './components/DockerView';
 import { GitWorkspacesView } from './components/GitWorkspacesView';
@@ -58,6 +61,12 @@ export const App: React.FC = () => {
     setIsArchitectureGraphOpen,
     isMiniMode,
     setIsMiniMode,
+    isUnifiedLogsOpen,
+    setIsUnifiedLogsOpen,
+    isGitMatrixOpen,
+    setIsGitMatrixOpen,
+    isWindowsTuningOpen,
+    setIsWindowsTuningOpen,
     activeEnvProject,
     setActiveEnvProject,
     activeCleanerProject,
@@ -147,6 +156,21 @@ export const App: React.FC = () => {
         if (e.key.toLowerCase() === 'g') {
           e.preventDefault();
           setIsArchitectureGraphOpen(!isArchitectureGraphOpen);
+        }
+        // Ctrl + Shift + L: Unified Log Aggregator ("Local Datadog")
+        if (e.key.toLowerCase() === 'l') {
+          e.preventDefault();
+          setIsUnifiedLogsOpen(!isUnifiedLogsOpen);
+        }
+        // Ctrl + Shift + K: Cross-Repo Git Matrix
+        if (e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          setIsGitMatrixOpen(!isGitMatrixOpen);
+        }
+        // Ctrl + Shift + E: Windows 11 Deep Performance & EcoQoS Tuning
+        if (e.key.toLowerCase() === 'e') {
+          e.preventDefault();
+          setIsWindowsTuningOpen(!isWindowsTuningOpen);
         }
       }
     };
@@ -440,6 +464,24 @@ export const App: React.FC = () => {
       <AppResourceInspectorModal
         project={activeResourceInspectorProject}
         onClose={() => setActiveResourceInspectorProject(null)}
+      />
+
+      {/* Unified Log Aggregator ("Local Datadog") Modal */}
+      <UnifiedLogAggregatorModal
+        isOpen={isUnifiedLogsOpen}
+        onClose={() => setIsUnifiedLogsOpen(false)}
+      />
+
+      {/* Cross-Repo Git Matrix Modal */}
+      <GitMatrixModal
+        isOpen={isGitMatrixOpen}
+        onClose={() => setIsGitMatrixOpen(false)}
+      />
+
+      {/* Windows 11 Deep Performance & EcoQoS Tuning Modal */}
+      <WindowsPerformanceModal
+        isOpen={isWindowsTuningOpen}
+        onClose={() => setIsWindowsTuningOpen(false)}
       />
 
       {/* Windows 11 Mini Tray Floating Widget */}

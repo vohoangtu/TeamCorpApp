@@ -21,7 +21,9 @@ import {
   Rocket,
   MoreHorizontal,
   Boxes,
-  Network
+  Network,
+  Gauge,
+  FolderGit2
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { THEMES, THEME_LIST } from '../themes';
@@ -51,6 +53,9 @@ export const CommandBar: React.FC<CommandBarProps> = ({ title, subtitle, onSyncA
     setIsDockerFleetOpen,
     setIsArchitectureGraphOpen,
     setIsMiniMode,
+    setIsUnifiedLogsOpen,
+    setIsGitMatrixOpen,
+    setIsWindowsTuningOpen,
     setActiveCopilot,
     themeId,
     setThemeId,
@@ -304,6 +309,26 @@ export const CommandBar: React.FC<CommandBarProps> = ({ title, subtitle, onSyncA
           <span className="hidden xl:inline">Workspaces</span>
         </button>
 
+        {/* Unified Log Aggregator ("Local Datadog") */}
+        <button
+          onClick={() => setIsUnifiedLogsOpen(true)}
+          className="fluent-btn-standard flex h-8 items-center gap-1.5 px-2.5 text-[13px] font-medium"
+          title="Unified Log Aggregator - Local Datadog cho Microservices (Ctrl+Shift+L)"
+        >
+          <Terminal className="h-3.5 w-3.5 text-emerald-500" />
+          <span className="hidden xl:inline">Unified Logs</span>
+        </button>
+
+        {/* Cross-Repo Git Matrix */}
+        <button
+          onClick={() => setIsGitMatrixOpen(true)}
+          className="fluent-btn-standard flex h-8 items-center gap-1.5 px-2.5 text-[13px] font-medium"
+          title="Cross-Repo Git Matrix - Đồng bộ nhánh đa repo (Ctrl+Shift+G)"
+        >
+          <FolderGit2 className="h-3.5 w-3.5 text-blue-500" />
+          <span className="hidden xl:inline">Git Matrix</span>
+        </button>
+
         {/* Developer Studio Tools Dropdown */}
         <div className="relative">
           <button
@@ -436,6 +461,54 @@ export const CommandBar: React.FC<CommandBarProps> = ({ title, subtitle, onSyncA
                     <div>
                       <div className="font-semibold">Architecture Topology</div>
                       <div className="text-[11px] text-hub-muted">Sơ đồ vi dịch vụ & kết nối DB/API</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsUnifiedLogsOpen(true);
+                      setIsToolsMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-hub-primary hover:bg-black/[0.04] dark:hover:bg-white/[0.06] text-left transition-colors"
+                  >
+                    <div className="flex h-7 w-7 items-center justify-center rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <Terminal className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Unified Log Aggregator</div>
+                      <div className="text-[11px] text-hub-muted">"Local Datadog" cho Microservices</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsGitMatrixOpen(true);
+                      setIsToolsMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-hub-primary hover:bg-black/[0.04] dark:hover:bg-white/[0.06] text-left transition-colors"
+                  >
+                    <div className="flex h-7 w-7 items-center justify-center rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <FolderGit2 className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Cross-Repo Git Matrix</div>
+                      <div className="text-[11px] text-hub-muted">Đồng bộ nhánh đa kho lưu trữ</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsWindowsTuningOpen(true);
+                      setIsToolsMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-hub-primary hover:bg-black/[0.04] dark:hover:bg-white/[0.06] text-left transition-colors"
+                  >
+                    <div className="flex h-7 w-7 items-center justify-center rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <Gauge className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Windows 11 Performance Tuning</div>
+                      <div className="text-[11px] text-hub-muted">EcoQoS E-cores & Dev Drive (ReFS)</div>
                     </div>
                   </button>
                 </div>

@@ -8,7 +8,13 @@ import type {
   DeploymentTarget, 
   DeploymentRecord,
   ProjectResourceTelemetry,
-  ResourcesSummary
+  ResourcesSummary,
+  AggregatedLogEntry,
+  GitMatrixRepo,
+  GitMatrixBatchResult,
+  ProcessPriority,
+  ProjectProcessPriority,
+  DevDriveAuditReport
 } from '../types';
 import { type ThemeId, THEMES, THEME_LIST, applyThemeToDocument, getStoredThemeId } from '../themes';
 import { type MaterialType, MATERIALS, MATERIAL_LIST, applyMaterialToDocument, getStoredMaterialType } from '../materials';
@@ -32,6 +38,9 @@ interface AppState {
   isDockerFleetOpen: boolean;
   isArchitectureGraphOpen: boolean;
   isMiniMode: boolean;
+  isUnifiedLogsOpen: boolean;
+  isGitMatrixOpen: boolean;
+  isWindowsTuningOpen: boolean;
   activeEnvProject: { id: string; name: string } | null;
   activeCleanerProject: { id: string; name: string } | null;
   activeScriptsProject: { id: string; name: string } | null;
@@ -60,6 +69,34 @@ interface AppState {
   setIsDockerFleetOpen: (open: boolean) => void;
   setIsArchitectureGraphOpen: (open: boolean) => void;
   setIsMiniMode: (open: boolean) => void;
+  setIsUnifiedLogsOpen: (open: boolean) => void;
+  setIsGitMatrixOpen: (open: boolean) => void;
+  setIsWindowsTuningOpen: (open: boolean) => void;
+
+  // Pillar 2: Unified Log Aggregator
+  aggregatedLogs: AggregatedLogEntry[];
+  addAggregatedLog: (entry: AggregatedLogEntry) => void;
+  clearAggregatedLogs: () => void;
+  fetchAggregatedLogs: (filter?: { projectIds?: string[]; levels?: string[]; search?: string }) => Promise<void>;
+
+  // Pillar 4: Cross-Repo Git Matrix
+  gitMatrix: GitMatrixRepo[];
+  fetchGitMatrix: () => Promise<void>;
+  batchCheckoutGitMatrix: (branch: string, createIfMissing?: boolean) => Promise<GitMatrixBatchResult[]>;
+  batchPullGitMatrix: () => Promise<GitMatrixBatchResult[]>;
+  batchStashGitMatrix: (message?: string) => Promise<GitMatrixBatchResult[]>;
+  checkoutGitRepo: (projectId: string, branch: string, createIfMissing?: boolean) => Promise<GitMatrixBatchResult>;
+  pullGitRepo: (projectId: string) => Promise<GitMatrixBatchResult>;
+  stashGitRepo: (projectId: string, message?: string) => Promise<GitMatrixBatchResult>;
+
+  // Pillar 5: Windows 11 Deep Performance & Dev Drive
+  tuningStatuses: ProjectProcessPriority[];
+  devDriveReport: DevDriveAuditReport | null;
+  fetchTuningStatuses: () => Promise<void>;
+  fetchDevDriveReport: () => Promise<void>;
+  setProjectPriority: (projectId: string, priority: ProcessPriority, isEcoMode: boolean) => Promise<{ success: boolean; message: string }>;
+  batchSetEcoMode: (enable: boolean) => Promise<{ success: boolean; affectedCount: number }>;
+
   setActiveEnvProject: (proj: { id: string; name: string } | null) => void;
   setActiveCleanerProject: (proj: { id: string; name: string } | null) => void;
   setActiveScriptsProject: (proj: { id: string; name: string } | null) => void;
@@ -130,6 +167,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   isDockerFleetOpen: false,
   isArchitectureGraphOpen: false,
   isMiniMode: false,
+  isUnifiedLogsOpen: false,
+  isGitMatrixOpen: false,
+  isWindowsTuningOpen: false,
+  setIsUnifiedLogsOpen: (open) => set({ isUnifiedLogsOpen: open }),
+  setIsGitMatrixOpen: (open) => set({ isGitMatrixOpen: open }),
+  setIsWindowsTuningOpen: (open) => set({ isWindowsTuningOpen: open }),
   activeEnvProject: null,
   activeCleanerProject: null,
   activeScriptsProject: null,
@@ -367,6 +410,168 @@ export const useAppStore = create<AppState>((set, get) => ({
     return null;
   },
 
+  // --- PILLAR 2: UNIFIED LOG AGGREGATOR ---
+  aggregatedLogs: [],
+  addAggregatedLog: (entry: AggregatedLogEntry) =>
+    set((state) => ({
+      aggregatedLogs: [...state.aggregatedLogs.slice(-1499), entry],
+    })),
+  clearAggregatedLogs: () => {
+    fetch('/api/logs/aggregated', { method: 'DELETE' }).catch(() => {});
+    set({ aggregatedLogs: [] });
+  },
+  fetchAggregatedLogs: async (filter) => {
+    try {
+      const params = new URLSearchParams();
+      if (filter?.projectIds?.length) params.set('projectIds', filter.projectIds.join(','));
+      if (filter?.levels?.length) params.set('levels', filter.levels.join(','));
+      if (filter?.search) params.set('search', filter.search);
+      const res = await fetch(`/api/logs/aggregated?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        set({ aggregatedLogs: data });
+      }
+    } catch {}
+  },
+
+  // --- PILLAR 4: CROSS-REPO GIT MATRIX ---
+  gitMatrix: [],
+  fetchGitMatrix: async () => {
+    try {
+      const res = await fetch('/api/git-matrix/status');
+      if (res.ok) {
+        const data = await res.json();
+        set({ gitMatrix: data });
+      }
+    } catch {}
+  },
+  batchCheckoutGitMatrix: async (branch, createIfMissing = false) => {
+    try {
+      const res = await fetch('/api/git-matrix/checkout-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch, createIfMissing }),
+      });
+      const data = await res.json();
+      get().fetchGitMatrix();
+      return data;
+    } catch (e: any) {
+      return [];
+    }
+  },
+  batchPullGitMatrix: async () => {
+    try {
+      const res = await fetch('/api/git-matrix/pull-all', { method: 'POST' });
+      const data = await res.json();
+      get().fetchGitMatrix();
+      return data;
+    } catch (e: any) {
+      return [];
+    }
+  },
+  batchStashGitMatrix: async (message) => {
+    try {
+      const res = await fetch('/api/git-matrix/stash-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+      const data = await res.json();
+      get().fetchGitMatrix();
+      return data;
+    } catch (e: any) {
+      return [];
+    }
+  },
+  checkoutGitRepo: async (projectId, branch, createIfMissing = false) => {
+    try {
+      const res = await fetch(`/api/git-matrix/${projectId}/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch, createIfMissing }),
+      });
+      const data = await res.json();
+      get().fetchGitMatrix();
+      return data;
+    } catch (e: any) {
+      return { projectId, projectName: 'Error', action: 'checkout', success: false, message: e.message };
+    }
+  },
+  pullGitRepo: async (projectId) => {
+    try {
+      const res = await fetch(`/api/git-matrix/${projectId}/pull`, { method: 'POST' });
+      const data = await res.json();
+      get().fetchGitMatrix();
+      return data;
+    } catch (e: any) {
+      return { projectId, projectName: 'Error', action: 'pull', success: false, message: e.message };
+    }
+  },
+  stashGitRepo: async (projectId, message) => {
+    try {
+      const res = await fetch(`/api/git-matrix/${projectId}/stash`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+      const data = await res.json();
+      get().fetchGitMatrix();
+      return data;
+    } catch (e: any) {
+      return { projectId, projectName: 'Error', action: 'stash', success: false, message: e.message };
+    }
+  },
+
+  // --- PILLAR 5: WINDOWS 11 DEEP PERFORMANCE & DEV DRIVE ---
+  tuningStatuses: [],
+  devDriveReport: null,
+  fetchTuningStatuses: async () => {
+    try {
+      const res = await fetch('/api/tuning/projects');
+      if (res.ok) {
+        const data = await res.json();
+        set({ tuningStatuses: data });
+      }
+    } catch {}
+  },
+  fetchDevDriveReport: async () => {
+    try {
+      const res = await fetch('/api/tuning/dev-drive-audit');
+      if (res.ok) {
+        const data = await res.json();
+        set({ devDriveReport: data });
+      }
+    } catch {}
+  },
+  setProjectPriority: async (projectId, priority, isEcoMode) => {
+    try {
+      const res = await fetch('/api/tuning/project-priority', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, priority, isEcoMode }),
+      });
+      const data = await res.json();
+      get().fetchTuningStatuses();
+      return data;
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  },
+  batchSetEcoMode: async (enable) => {
+    try {
+      const res = await fetch('/api/tuning/batch-eco', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enable }),
+      });
+      const data = await res.json();
+      get().fetchTuningStatuses();
+      return data;
+    } catch (e: any) {
+      return { success: false, affectedCount: 0 };
+    }
+  },
+
   connectWebSocket: () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -430,6 +635,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             NotificationService.notify('🩺 Tự động phục hồi (Auto-Recovery)', {
               body: msg.payload.message,
             });
+          } else if (msg.type === 'log:aggregated') {
+            get().addAggregatedLog(msg.payload);
+          } else if (msg.type === 'log:aggregated_cleared') {
+            set({ aggregatedLogs: [] });
           }
         } catch (e) {
           console.error('WS parse error', e);

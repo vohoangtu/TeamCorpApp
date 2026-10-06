@@ -24,7 +24,10 @@ import { architectureGraphService } from './architecture-graph';
 import { dependencyDoctor } from './dependency-doctor';
 import { resourceMonitor } from './resource-monitor';
 import { folderChooserService } from './folder-chooser';
-import type { CreateProjectPayload, Project } from '../src/types';
+import { logAggregator } from './log-aggregator';
+import { gitMatrixService } from './git-matrix';
+import { windowsTuningService } from './windows-tuning';
+import type { CreateProjectPayload, Project, LogEntry, ProcessPriority } from '../src/types';
 
 const PORT = 4100;
 const server = http.createServer();
@@ -41,10 +44,16 @@ function broadcast(type: string, payload: any) {
   }
 }
 
+function sendProjectLog(projectId: string, log: LogEntry, target: 'windows' | 'wsl' | 'docker' = 'windows') {
+  broadcast('project:log', { projectId, log });
+  logAggregator.add(projectId, log, target);
+}
+
 syncEngine.setBroadcast(broadcast);
 healthSentinel.setBroadcast(broadcast);
 resourceMonitor.setBroadcast(broadcast);
 resourceMonitor.startPolling(3000);
+logAggregator.setBroadcast(broadcast);
 
 let lastCpuMeasure = os.cpus();
 function calculateCpuUsage(): number {
@@ -254,12 +263,14 @@ server.on('request', async (req, res) => {
       if (method === 'POST' && action === 'start') {
         project.status = 'running';
 
+        const targetType = project.runtimeType === 'wsl2' ? 'wsl' : project.runtimeType === 'docker' ? 'docker' : 'windows';
+
         if (project.runtimeType === 'native' || project.runtimeType === 'wsl2') {
           const { pid } = processManager.start(
             project.id,
             project.sourcePath,
             project.runCommand,
-            (log) => broadcast('project:log', { projectId: project.id, log }),
+            (log) => sendProjectLog(project.id, log, targetType),
             (code) => {
               const p = projectStore.get(project.id);
               if (p) {
@@ -274,12 +285,18 @@ server.on('request', async (req, res) => {
             project.runtimeType
           );
           project.pid = pid;
+
+          // Auto-apply saved Windows Priority / EcoQoS if native
+          if (project.runtimeType === 'native') {
+            const tuning = windowsTuningService.getConfig(project.id);
+            windowsTuningService.setProcessPriority(project.id, tuning.priority, tuning.isEcoMode).catch(() => {});
+          }
         } else {
           dockerManager.start(
             project.id,
             project.sourcePath,
             project.runCommand,
-            (log) => broadcast('project:log', { projectId: project.id, log }),
+            (log) => sendProjectLog(project.id, log, 'docker'),
             (code) => {
               const p = projectStore.get(project.id);
               if (p) {
@@ -300,11 +317,12 @@ server.on('request', async (req, res) => {
 
       // POST /api/projects/:id/stop
       if (method === 'POST' && action === 'stop') {
+        const targetType = project.runtimeType === 'wsl2' ? 'wsl' : project.runtimeType === 'docker' ? 'docker' : 'windows';
         if (project.runtimeType === 'native' || project.runtimeType === 'wsl2') {
           await processManager.stop(id);
         } else {
           await dockerManager.stop(id, project.sourcePath, (log) =>
-            broadcast('project:log', { projectId: id, log })
+            sendProjectLog(id, log, 'docker')
           );
         }
         project.status = 'stopped';
@@ -320,13 +338,14 @@ server.on('request', async (req, res) => {
 
       // POST /api/projects/:id/restart
       if (method === 'POST' && action === 'restart') {
+        const targetType = project.runtimeType === 'wsl2' ? 'wsl' : project.runtimeType === 'docker' ? 'docker' : 'windows';
         if (project.runtimeType === 'native' || project.runtimeType === 'wsl2') {
           await processManager.stop(id);
           const { pid } = processManager.start(
             id,
             project.sourcePath,
             project.runCommand,
-            (log) => broadcast('project:log', { projectId: id, log }),
+            (log) => sendProjectLog(id, log, targetType),
             (code) => {
               const p = projectStore.get(id);
               if (p) {
@@ -339,15 +358,20 @@ server.on('request', async (req, res) => {
             project.runtimeType
           );
           project.pid = pid;
+
+          if (project.runtimeType === 'native') {
+            const tuning = windowsTuningService.getConfig(project.id);
+            windowsTuningService.setProcessPriority(project.id, tuning.priority, tuning.isEcoMode).catch(() => {});
+          }
         } else {
           await dockerManager.stop(id, project.sourcePath, (log) =>
-            broadcast('project:log', { projectId: id, log })
+            sendProjectLog(id, log, 'docker')
           );
           dockerManager.start(
             id,
             project.sourcePath,
             project.runCommand,
-            (log) => broadcast('project:log', { projectId: id, log }),
+            (log) => sendProjectLog(id, log, 'docker'),
             () => {}
           );
         }
@@ -789,6 +813,155 @@ server.on('request', async (req, res) => {
       const result = folderChooserService.listDirectory(targetPath);
       res.writeHead(200);
       res.end(JSON.stringify(result));
+      return;
+    }
+
+    // =========================================================================
+    // 📜 PILLAR 2: UNIFIED LOG AGGREGATOR ("LOCAL DATADOG" CHO MICROSERVICES)
+    // =========================================================================
+    if (pathname === '/api/logs/aggregated') {
+      if (method === 'GET') {
+        const projectIdsParam = parsedUrl.searchParams.get('projectIds');
+        const levelsParam = parsedUrl.searchParams.get('levels');
+        const search = parsedUrl.searchParams.get('search') || undefined;
+        const limit = parseInt(parsedUrl.searchParams.get('limit') || '500', 10);
+
+        const projectIds = projectIdsParam ? projectIdsParam.split(',').filter(Boolean) : undefined;
+        const levels = levelsParam ? (levelsParam.split(',').filter(Boolean) as any) : undefined;
+
+        const logs = logAggregator.getLogs({ projectIds, levels, search, limit });
+        res.writeHead(200);
+        res.end(JSON.stringify(logs));
+        return;
+      }
+
+      if (method === 'DELETE') {
+        logAggregator.clear();
+        res.writeHead(200);
+        res.end(JSON.stringify({ success: true }));
+        return;
+      }
+    }
+
+    if (method === 'GET' && pathname === '/api/logs/export') {
+      const format = parsedUrl.searchParams.get('format') || 'text';
+      const projectIdsParam = parsedUrl.searchParams.get('projectIds');
+      const levelsParam = parsedUrl.searchParams.get('levels');
+      const search = parsedUrl.searchParams.get('search') || undefined;
+      const projectIds = projectIdsParam ? projectIdsParam.split(',').filter(Boolean) : undefined;
+      const levels = levelsParam ? (levelsParam.split(',').filter(Boolean) as any) : undefined;
+
+      const filter = { projectIds, levels, search };
+
+      if (format === 'json') {
+        const data = logAggregator.exportAsJson(filter);
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', 'attachment; filename="windev-logs.json"');
+        res.writeHead(200);
+        res.end(data);
+        return;
+      } else {
+        const data = logAggregator.exportAsText(filter);
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="windev-logs.log"');
+        res.writeHead(200);
+        res.end(data);
+        return;
+      }
+    }
+
+    // =========================================================================
+    // 🌿 PILLAR 4: CROSS-REPO GIT MATRIX (ĐỒNG BỘ NHÁNH MICROSERVICES ĐA REPO)
+    // =========================================================================
+    if (pathname === '/api/git-matrix/status' && method === 'GET') {
+      const status = await gitMatrixService.getMatrixStatus();
+      res.writeHead(200);
+      res.end(JSON.stringify(status));
+      return;
+    }
+
+    if (pathname === '/api/git-matrix/checkout-all' && method === 'POST') {
+      const body = await parseBody<{ branch: string; createIfMissing?: boolean }>(req);
+      const results = await gitMatrixService.batchCheckout(body.branch, body.createIfMissing);
+      res.writeHead(200);
+      res.end(JSON.stringify(results));
+      return;
+    }
+
+    if (pathname === '/api/git-matrix/pull-all' && method === 'POST') {
+      const results = await gitMatrixService.batchPull();
+      res.writeHead(200);
+      res.end(JSON.stringify(results));
+      return;
+    }
+
+    if (pathname === '/api/git-matrix/stash-all' && method === 'POST') {
+      const body = await parseBody<{ message?: string }>(req);
+      const results = await gitMatrixService.batchStash(body.message);
+      res.writeHead(200);
+      res.end(JSON.stringify(results));
+      return;
+    }
+
+    const gitSingleMatch = pathname.match(/^\/api\/git-matrix\/([^/]+)\/(checkout|pull|stash)$/);
+    if (gitSingleMatch && method === 'POST') {
+      const projId = gitSingleMatch[1];
+      const actionType = gitSingleMatch[2];
+
+      if (actionType === 'checkout') {
+        const body = await parseBody<{ branch: string; createIfMissing?: boolean }>(req);
+        const result = await gitMatrixService.checkoutRepo(projId, body.branch, body.createIfMissing);
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+        return;
+      }
+
+      if (actionType === 'pull') {
+        const result = await gitMatrixService.pullRepo(projId);
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+        return;
+      }
+
+      if (actionType === 'stash') {
+        const body = await parseBody<{ message?: string }>(req);
+        const result = await gitMatrixService.stashRepo(projId, body.message);
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+        return;
+      }
+    }
+
+    // =========================================================================
+    // ⚡ PILLAR 5: WINDOWS 11 DEEP PERFORMANCE & DEV DRIVE (REFS) AUDIT
+    // =========================================================================
+    if (pathname === '/api/tuning/projects' && method === 'GET') {
+      const status = await windowsTuningService.getProjectsPriorityStatus();
+      res.writeHead(200);
+      res.end(JSON.stringify(status));
+      return;
+    }
+
+    if (pathname === '/api/tuning/project-priority' && method === 'POST') {
+      const body = await parseBody<{ projectId: string; priority: ProcessPriority; isEcoMode?: boolean }>(req);
+      const result = await windowsTuningService.setProcessPriority(body.projectId, body.priority, !!body.isEcoMode);
+      res.writeHead(200);
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (pathname === '/api/tuning/batch-eco' && method === 'POST') {
+      const body = await parseBody<{ enable: boolean }>(req);
+      const result = await windowsTuningService.batchSetEcoMode(body.enable);
+      res.writeHead(200);
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (pathname === '/api/tuning/dev-drive-audit' && method === 'GET') {
+      const report = await windowsTuningService.auditDevDrives();
+      res.writeHead(200);
+      res.end(JSON.stringify(report));
       return;
     }
 

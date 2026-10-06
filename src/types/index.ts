@@ -321,5 +321,96 @@ export interface DependencyAuditReport {
   scannedAt: string;
 }
 
+// --- 📜 PILLAR 2: UNIFIED LOG AGGREGATOR ("LOCAL DATADOG") ---
+export type LogLevel = 'info' | 'warn' | 'error' | 'debug';
+
+export interface AggregatedLogEntry {
+  id: string;
+  projectId: string;
+  projectName: string;
+  projectColor: string;
+  target: 'windows' | 'wsl' | 'docker';
+  level: LogLevel;
+  stream: 'stdout' | 'stderr' | 'system';
+  message: string;
+  timestamp: string;
+  sequence: number;
+  correlationId?: string;
+}
+
+export interface AggregatedLogFilter {
+  projectIds?: string[];
+  levels?: LogLevel[];
+  search?: string;
+  startTime?: string;
+  limit?: number;
+}
+
+// --- 🌿 PILLAR 4: CROSS-REPO GIT MATRIX ---
+export interface GitMatrixRepo {
+  projectId: string;
+  projectName: string;
+  sourcePath: string;
+  isGitRepo: boolean;
+  currentBranch: string;
+  localBranches: string[];
+  aheadCount: number;
+  behindCount: number;
+  dirtyFilesCount: number;
+  untrackedCount: number;
+  lastCommit?: {
+    hash: string;
+    message: string;
+    author: string;
+    date: string;
+  };
+  hasConflict: boolean;
+}
+
+export interface GitMatrixBatchResult {
+  projectId: string;
+  projectName: string;
+  action: 'checkout' | 'pull' | 'stash';
+  success: boolean;
+  message: string;
+}
+
+// --- ⚡ PILLAR 5: WINDOWS 11 DEEP PERFORMANCE & DEV DRIVE ---
+export type ProcessPriority = 'idle' | 'below_normal' | 'normal' | 'above_normal' | 'high';
+
+export interface ProjectProcessPriority {
+  projectId: string;
+  projectName: string;
+  pid?: number;
+  status: 'running' | 'stopped';
+  priority: ProcessPriority;
+  isEcoMode: boolean;
+  affinityMask?: number;
+  appliedAt?: string;
+}
+
+export interface DevDriveAuditItem {
+  projectId: string;
+  projectName: string;
+  sourcePath: string;
+  driveLetter: string;
+  fileSystem: string;
+  isDevDrive: boolean;
+  driveTotalGb: number;
+  driveFreeGb: number;
+  speedScore: 'accelerated' | 'standard' | 'slow';
+  recommendation: string;
+}
+
+export interface DevDriveAuditReport {
+  items: DevDriveAuditItem[];
+  refsCount: number;
+  ntfsCount: number;
+  totalProjects: number;
+  summary: string;
+  guideUrl: string;
+}
+
+
 
 

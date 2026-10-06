@@ -25,13 +25,22 @@ export const GitWorkspacesView: React.FC = () => {
             </div>
           </div>
 
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-md bg-[#0F6CBD] hover:bg-[#115EA3] px-3.5 py-2 text-xs font-semibold text-white shadow-sm"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Clone Repository Mới</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => useAppStore.getState().setIsGitMatrixOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-[var(--hub-accent)]/30 bg-[var(--hub-accent)]/10 text-[var(--hub-accent)] hover:bg-[var(--hub-accent)]/20 px-3.5 py-2 text-xs font-semibold shadow-xs transition-colors"
+            >
+              <GitBranch className="h-4 w-4" />
+              <span>Cross-Repo Git Matrix</span>
+            </button>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-md bg-[#0F6CBD] hover:bg-[#115EA3] px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Clone Repository Mới</span>
+            </button>
+          </div>
         </div>
       </div>
 
