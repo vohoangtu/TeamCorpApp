@@ -163,21 +163,21 @@ export const AddProjectModal: React.FC = () => {
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-md animate-fade-in transition-colors cursor-default"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in transition-colors cursor-default"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="relative w-full max-w-2xl rounded-xl border border-hub bg-hub-card shadow-2xl p-6 overflow-hidden transition-colors">
+      <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl border border-hub bg-hub-card shadow-2xl overflow-hidden transition-colors">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-hub">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-hub bg-hub-sidebar/70 backdrop-blur-md shrink-0">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Layers className="h-5 w-5 text-sky-500 dark:text-sky-400" />
               Add Project to WinDev Hub
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Deploy & orchestrate your local apps with instant hot-sync
+              Đăng ký và điều phối ứng dụng local, tự động phát hiện framework và hot-sync
             </p>
           </div>
           <button
@@ -191,17 +191,20 @@ export const AddProjectModal: React.FC = () => {
         </div>
 
         {error && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300">
+          <div className="mx-6 mt-4 flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          {/* Source Tabs */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Project Source:</label>
-            <div className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column: Source & Name */}
+            <div className="space-y-4">
+              {/* Source Tabs */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Project Source:</label>
+                <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setSourceType('local')}
@@ -367,106 +370,111 @@ export const AddProjectModal: React.FC = () => {
             </div>
           )}
 
-          {/* Project Name */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Display Name:</label>
-            <input
-              type="text"
-              placeholder="My Project"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-              required
-            />
-          </div>
-
-          {/* Runtime Type & Commands */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Deployment Target (Mục Tiêu Triển Khai):
-              </label>
-              <select
-                value={runtimeType}
-                onChange={(e) => {
-                  const val = e.target.value as RuntimeType;
-                  setRuntimeType(val);
-                  if (val === 'docker') {
-                    setRunCommand('docker compose up');
-                  } else {
-                    setRunCommand('npm run dev');
-                  }
-                }}
-                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white font-medium"
-              >
-                <option value="native">🪟 Windows Native (Khởi động tức thì, tối ưu RAM)</option>
-                <option value="wsl2">🐧 WSL2 Linux Sandbox (Nhân Linux chuẩn, ext4 siêu tốc)</option>
-                <option value="docker">🐳 Docker Container (Môi trường đóng gói)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Port (Local):</label>
-              <input
-                type="number"
-                placeholder="3000"
-                value={port}
-                onChange={(e) => setPort(e.target.value ? Number(e.target.value) : '')}
-                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Run Command:
-              </label>
-              <input
-                type="text"
-                placeholder="npm run dev or python app.py"
-                value={runCommand}
-                onChange={(e) => setRunCommand(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Sync / Build Command (Optional):
-              </label>
-              <input
-                type="text"
-                placeholder="npm run build or pip install -r requirements.txt"
-                value={buildCommand}
-                onChange={(e) => setBuildCommand(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-              />
-            </div>
-          </div>
-
-          {/* Auto-sync Option */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 flex items-center justify-between dark:border-slate-800 dark:bg-slate-950/60">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-sky-500 dark:text-sky-400" />
+              {/* Project Name */}
               <div>
-                <p className="text-xs font-semibold text-slate-800 dark:text-white">Auto-sync on File Save</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Tự động phát hiện thay đổi trong folder để trigger sync mà không cần bấm nút thủ công
-                </p>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Display Name:</label>
+                <input
+                  type="text"
+                  placeholder="My Project"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-xs text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                  required
+                />
               </div>
             </div>
-            <input
-              type="checkbox"
-              checked={autoSync}
-              onChange={(e) => setAutoSync(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 bg-white text-sky-500 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-800"
-            />
+
+            {/* Right Column: Runtime Target & Commands */}
+            <div className="space-y-4">
+              {/* Runtime Type & Commands */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Deployment Target:
+                  </label>
+                  <select
+                    value={runtimeType}
+                    onChange={(e) => {
+                      const val = e.target.value as RuntimeType;
+                      setRuntimeType(val);
+                      if (val === 'docker') {
+                        setRunCommand('docker compose up');
+                      } else {
+                        setRunCommand('npm run dev');
+                      }
+                    }}
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white font-medium"
+                  >
+                    <option value="native">🪟 Windows Native (Khởi động tức thì)</option>
+                    <option value="wsl2">🐧 WSL2 Sandbox (Linux ext4)</option>
+                    <option value="docker">🐳 Docker Container</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Port (Local):</label>
+                  <input
+                    type="number"
+                    placeholder="3000"
+                    value={port}
+                    onChange={(e) => setPort(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Run Command:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="npm run dev or python app.py"
+                    value={runCommand}
+                    onChange={(e) => setRunCommand(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Sync / Build Command (Optional):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="npm run build"
+                    value={buildCommand}
+                    onChange={(e) => setBuildCommand(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-900 focus:bg-white focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Auto-sync Option */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 flex items-center justify-between dark:border-slate-800 dark:bg-slate-950/60">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-sky-500 dark:text-sky-400" />
+                  <div>
+                    <p className="text-xs font-semibold text-slate-800 dark:text-white">Auto-sync on File Save</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Tự động phát hiện thay đổi trong folder để trigger sync mà không cần bấm nút thủ công
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={autoSync}
+                  onChange={(e) => setAutoSync(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 bg-white text-sky-500 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-800"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Submit */}
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
+          {/* Submit Action Bar */}
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={handleClose}

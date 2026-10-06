@@ -148,7 +148,7 @@ export const AppResourceInspectorModal: React.FC<AppResourceInspectorModalProps>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="fluent-card relative flex flex-col max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl shadow-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1C1C1C]">
+      <div className="fluent-card relative flex flex-col max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1C1C1C]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-black/[0.08] dark:border-white/[0.08] px-6 py-4 bg-black/[0.02] dark:bg-white/[0.02]">
           <div className="flex items-center gap-3">

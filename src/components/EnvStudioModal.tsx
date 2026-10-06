@@ -97,150 +97,192 @@ export const EnvStudioModal: React.FC<EnvStudioModalProps> = ({
     }
   };
 
+  const [searchVar, setSearchVar] = useState('');
+
   if (!isOpen) return null;
 
+  const filteredItems = items.map((item, originalIndex) => ({ item, originalIndex })).filter(({ item }) => {
+    if (!searchVar.trim()) return true;
+    const q = searchVar.toLowerCase();
+    return item.key.toLowerCase().includes(q) || item.value.toLowerCase().includes(q);
+  });
+
+  const secretCount = items.filter((i) => i.isSecret).length;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs select-none animate-in fade-in duration-100">
-      <div className="w-full max-w-2xl rounded-lg border border-hub bg-hub-card shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none animate-in fade-in duration-100">
+      <div className="w-full max-w-6xl rounded-xl border border-hub bg-hub-card shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-hub bg-hub-sidebar">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-[#0F6CBD]/10 text-[#0F6CBD] dark:bg-[#0F6CBD]/20 dark:text-[#479EF5]">
-              <KeyRound className="h-4.5 w-4.5" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-hub bg-hub-sidebar">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0F6CBD]/10 text-[#0F6CBD] dark:bg-[#0F6CBD]/20 dark:text-[#479EF5] ring-1 ring-[#0F6CBD]/20">
+              <KeyRound className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-[15px] font-bold text-hub-primary flex items-center gap-2">
-                Visual .env & Secrets Studio
-              </h3>
-              <p className="text-[12px] text-hub-muted">
-                Dự án: <strong className="text-hub-primary">{projectName}</strong> • {envData?.fileName || '.env'}
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-hub-primary">
+                  Visual .env & Secrets Studio
+                </h3>
+                <span className="rounded-full bg-[#0F6CBD]/10 text-[#0F6CBD] dark:text-[#479EF5] px-2 py-0.5 text-[11px] font-semibold">
+                  Environment Ops
+                </span>
+              </div>
+              <p className="text-xs text-hub-muted">
+                Dự án: <strong className="text-hub-primary">{projectName}</strong> • Quản lý biến môi trường trực quan, tự động sao lưu an toàn
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-[4px] text-hub-muted hover:bg-black/[0.05] dark:hover:bg-white/[0.06] hover:text-hub-primary transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-hub-muted hover:bg-black/[0.05] dark:hover:bg-white/[0.06] hover:text-hub-primary transition-colors"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4.5 w-4.5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {saveSuccess && (
-            <div className="flex items-center gap-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <Check className="h-4 w-4" />
-              <span>Đã lưu biến môi trường và tạo bản sao lưu (.backup) thành công!</span>
+            <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+              <Check className="h-4.5 w-4.5 shrink-0" />
+              <span>Đã lưu file {envData?.fileName || '.env'} và tạo bản sao lưu (.backup) an toàn thành công!</span>
             </div>
           )}
 
+          {/* Quick Metrics & Search Bar */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+            <div className="md:col-span-8 flex items-center gap-3">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm biến môi trường theo Key hoặc Value..."
+                  value={searchVar}
+                  onChange={(e) => setSearchVar(e.target.value)}
+                  className="h-8 w-full rounded-md border border-hub bg-hub-card px-3 text-xs text-hub-primary focus:border-[var(--hub-accent)] focus:outline-none"
+                />
+              </div>
+              <button
+                onClick={handleAddItem}
+                className="fluent-btn-standard h-8 px-3 text-xs inline-flex items-center gap-1.5 shrink-0"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Thêm Biến</span>
+              </button>
+            </div>
+
+            <div className="md:col-span-4 flex items-center justify-end gap-3 text-xs">
+              <div className="rounded-md border border-hub px-3 py-1.5 bg-black/[0.02] dark:bg-white/[0.02]">
+                <span className="text-hub-muted">Tổng: </span>
+                <span className="font-bold font-mono text-hub-primary">{items.length} biến</span>
+              </div>
+              <div className="rounded-md border border-hub px-3 py-1.5 bg-black/[0.02] dark:bg-white/[0.02]">
+                <span className="text-hub-muted">Bảo mật: </span>
+                <span className="font-bold font-mono text-amber-500">{secretCount} secret</span>
+              </div>
+            </div>
+          </div>
+
           {loading ? (
-            <div className="py-12 text-center text-hub-muted">
-              <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-hub-accent" />
-              Đang tải danh sách biến môi trường...
+            <div className="py-16 text-center text-hub-muted">
+              <RefreshCw className="h-7 w-7 animate-spin mx-auto mb-3 text-hub-accent" />
+              <p className="text-sm font-semibold text-hub-primary">Đang nạp file cấu hình môi trường...</p>
             </div>
           ) : items.length === 0 ? (
-            <div className="rounded-md border border-dashed border-hub p-8 text-center">
-              <FileText className="h-8 w-8 mx-auto text-hub-muted mb-2 opacity-50" />
-              <p className="text-xs font-semibold text-hub-primary">Chưa có biến môi trường nào</p>
-              <p className="text-[11px] text-hub-muted mt-1 mb-3">
+            <div className="rounded-xl border border-dashed border-hub p-12 text-center bg-black/[0.01] dark:bg-white/[0.01]">
+              <FileText className="h-10 w-10 mx-auto text-hub-muted mb-3 opacity-50" />
+              <p className="text-sm font-bold text-hub-primary">Chưa có biến môi trường nào</p>
+              <p className="text-xs text-hub-muted mt-1 mb-4">
                 Thêm biến mới vào file {envData?.fileName || '.env'} để sử dụng trong dự án.
               </p>
               <button
                 onClick={handleAddItem}
-                className="fluent-btn-standard h-7 px-3 text-xs inline-flex items-center gap-1.5"
+                className="fluent-btn-standard h-8 px-4 text-xs inline-flex items-center gap-1.5"
               >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Thêm biến mới</span>
+                <Plus className="h-4 w-4" />
+                <span>Thêm biến đầu tiên</span>
               </button>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-2 text-[11px] font-bold text-hub-muted uppercase px-1">
-                <div className="col-span-5">Tên Biến (Key)</div>
-                <div className="col-span-6">Giá Trị (Value)</div>
+            <div className="rounded-xl border border-hub overflow-hidden shadow-2xs">
+              <div className="grid grid-cols-12 gap-3 px-4 py-2.5 border-b border-hub bg-black/[0.02] dark:bg-white/[0.03] text-[11px] font-bold text-hub-muted uppercase tracking-wider">
+                <div className="col-span-4">Tên Biến (Key)</div>
+                <div className="col-span-7">Giá Trị (Value)</div>
                 <div className="col-span-1 text-center">Xóa</div>
               </div>
 
-              {items.map((item, idx) => {
-                const isSecret = item.isSecret;
-                const isRevealed = revealedKeys[item.key] || false;
+              <div className="divide-y divide-hub">
+                {filteredItems.map(({ item, originalIndex }) => {
+                  const isSecret = item.isSecret;
+                  const isRevealed = revealedKeys[item.key] || false;
 
-                return (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    {/* Key Input */}
-                    <div className="col-span-5">
-                      <input
-                        type="text"
-                        value={item.key}
-                        onChange={(e) => handleUpdateItem(idx, 'key', e.target.value)}
-                        className="h-8 w-full rounded-[4px] border border-hub bg-hub-card px-2.5 text-xs font-mono font-semibold text-hub-primary focus:border-[var(--hub-accent)] focus:outline-none"
-                        placeholder="KEY_NAME"
-                      />
-                    </div>
+                  return (
+                    <div key={originalIndex} className="grid grid-cols-12 gap-3 items-center px-4 py-2.5 hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
+                      {/* Key Input */}
+                      <div className="col-span-4">
+                        <input
+                          type="text"
+                          value={item.key}
+                          onChange={(e) => handleUpdateItem(originalIndex, 'key', e.target.value)}
+                          className="h-8 w-full rounded-md border border-hub bg-hub-card px-2.5 text-xs font-mono font-bold text-hub-primary focus:border-[var(--hub-accent)] focus:outline-none"
+                          placeholder="KEY_NAME"
+                        />
+                      </div>
 
-                    {/* Value Input */}
-                    <div className="col-span-6 relative flex items-center">
-                      <input
-                        type={isSecret && !isRevealed ? 'password' : 'text'}
-                        value={item.value}
-                        onChange={(e) => handleUpdateItem(idx, 'value', e.target.value)}
-                        className="h-8 w-full rounded-[4px] border border-hub bg-hub-card pl-2.5 pr-8 text-xs font-mono text-hub-primary focus:border-[var(--hub-accent)] focus:outline-none"
-                        placeholder="giá trị..."
-                      />
-                      {isSecret && (
+                      {/* Value Input */}
+                      <div className="col-span-7 relative flex items-center">
+                        <input
+                          type={isSecret && !isRevealed ? 'password' : 'text'}
+                          value={item.value}
+                          onChange={(e) => handleUpdateItem(originalIndex, 'value', e.target.value)}
+                          className="h-8 w-full rounded-md border border-hub bg-hub-card pl-3 pr-10 text-xs font-mono text-hub-primary focus:border-[var(--hub-accent)] focus:outline-none"
+                          placeholder="giá trị biến..."
+                        />
+                        {isSecret && (
+                          <button
+                            type="button"
+                            onClick={() => toggleReveal(item.key)}
+                            className="absolute right-2.5 text-hub-muted hover:text-hub-primary transition-colors"
+                            title={isRevealed ? 'Ẩn giá trị bảo mật' : 'Hiển thị giá trị'}
+                          >
+                            {isRevealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4 text-amber-500" />}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Delete action */}
+                      <div className="col-span-1 flex justify-center">
                         <button
-                          type="button"
-                          onClick={() => toggleReveal(item.key)}
-                          className="absolute right-2 text-hub-muted hover:text-hub-primary transition-colors"
-                          title={isRevealed ? 'Ẩn giá trị bảo mật' : 'Hiển thị giá trị'}
+                          onClick={() => handleDeleteItem(originalIndex)}
+                          className="flex h-7 w-7 items-center justify-center rounded text-hub-muted hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                          title="Xóa biến"
                         >
-                          {isRevealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
-                      )}
+                      </div>
                     </div>
-
-                    {/* Delete action */}
-                    <div className="col-span-1 flex justify-center">
-                      <button
-                        onClick={() => handleDeleteItem(idx)}
-                        className="flex h-7 w-7 items-center justify-center rounded text-hub-muted hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                        title="Xóa biến"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-
-              <button
-                onClick={handleAddItem}
-                className="flex items-center gap-1.5 text-xs font-semibold text-[var(--hub-accent)] hover:underline pt-2"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Thêm dòng biến môi trường mới</span>
-              </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-hub bg-hub-sidebar">
-          <span className="text-[11px] text-hub-muted truncate max-w-xs font-mono">
+        <div className="flex items-center justify-between px-6 py-3.5 border-t border-hub bg-hub-sidebar">
+          <span className="text-[11px] text-hub-muted truncate max-w-md font-mono">
             {envData?.filePath}
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="fluent-btn-standard h-8 px-3 text-xs"
+              className="fluent-btn-standard h-8 px-4 text-xs font-semibold"
             >
               Hủy
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="fluent-btn-primary flex items-center gap-1.5 h-8 px-4 text-xs font-semibold"
+              className="fluent-btn-primary flex items-center gap-1.5 h-8 px-5 text-xs font-semibold shadow-sm"
             >
               <Save className="h-3.5 w-3.5" />
               <span>{saving ? 'Đang lưu...' : 'Lưu File .env'}</span>

@@ -62,7 +62,7 @@ export const ArchitectureGraphModal: React.FC<ArchitectureGraphModalProps> = ({ 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="flex flex-col w-full max-w-5xl max-h-[90vh] rounded-xl border border-hub bg-hub-card shadow-2xl overflow-hidden">
+      <div className="flex flex-col w-full max-w-6xl max-h-[90vh] rounded-xl border border-hub bg-hub-card shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-hub px-6 py-4 bg-black/[0.02] dark:bg-white/[0.02]">
           <div className="flex items-center gap-3">
