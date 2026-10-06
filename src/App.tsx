@@ -29,6 +29,8 @@ import { WindowsPerformanceModal } from './components/WindowsPerformanceModal';
 import { SyncStudioView } from './components/SyncStudioView';
 import { DockerView } from './components/DockerView';
 import { GitWorkspacesView } from './components/GitWorkspacesView';
+import { UnifiedLogsView } from './components/UnifiedLogsView';
+import { WindowsPerformanceView } from './components/WindowsPerformanceView';
 import { SettingsView } from './components/SettingsView';
 import { useAppStore } from './store/useAppStore';
 import { Plus, FolderGit2, Zap } from 'lucide-react';
@@ -216,15 +218,38 @@ export const App: React.FC = () => {
   const getTabTitle = () => {
     switch (currentTab) {
       case 'dashboard':
-        return 'Dashboard & Applications';
+        return 'Dashboard & Ứng Dụng';
       case 'sync-studio':
-        return 'Trigger Sync Studio';
-      case 'docker':
-        return 'Docker Environments';
+        return 'Deploy Pipelines & Sync Studio';
+      case 'logs':
+        return 'Unified Log Aggregator';
       case 'git':
-        return 'Git Repositories Workspace';
+        return 'Cross-Repo Git Matrix';
+      case 'docker':
+        return 'Target Fleets (Docker & WSL2)';
+      case 'tuning':
+        return 'Windows 11 Performance Tuning';
       case 'settings':
-        return 'Environment & Tooling';
+        return 'Cài Đặt & Giao Diện';
+    }
+  };
+
+  const getTabSubtitle = () => {
+    switch (currentTab) {
+      case 'dashboard':
+        return 'Quản lý tiến trình ứng dụng local, CPU/RAM meter và điều khiển vòng đời theo chuẩn Windows 11.';
+      case 'sync-studio':
+        return 'Hệ thống Pipelines điều phối đa môi trường (Native Windows, WSL2 Sandbox, Docker Containers).';
+      case 'logs':
+        return 'Tổng hợp dòng thời gian nhật ký đa vi dịch vụ thời gian thực theo mô hình Local Datadog.';
+      case 'git':
+        return 'Giám sát nhánh, theo dõi tệp sửa đổi và thực thi thao tác đồng bộ Git song song đa kho lưu trữ.';
+      case 'docker':
+        return 'Quản lý container Docker độc lập và phân bổ tài nguyên phần cứng máy ảo WSL2 Linux.';
+      case 'tuning':
+        return 'Tối ưu hóa luồng CPU EcoQoS (Efficiency Mode) và kiểm toán tăng tốc ổ đĩa Dev Drive (ReFS).';
+      case 'settings':
+        return 'Tùy biến bộ sưu tập Developer Theme kinh điển và bề mặt chất liệu Microsoft Fluent 2.';
     }
   };
 
@@ -247,8 +272,8 @@ export const App: React.FC = () => {
           {/* Top CommandBar with Segmented Theme Switch & View Mode */}
           <CommandBar
             title={getTabTitle()}
-            subtitle="Microsoft Fluent 2"
             onSyncAll={handleSyncAll}
+            showViewModeToggle={currentTab === 'dashboard'}
           />
 
           {/* Scrollable Viewport - Fluent 2 Dev Home Standard Spacing (px-8 py-6) */}
@@ -260,7 +285,7 @@ export const App: React.FC = () => {
                   {getTabTitle()}
                 </h1>
                 <p className="text-[13px] text-hub-secondary mt-0.5">
-                  Quản lý tiến trình ứng dụng local, tự động biên dịch và Trigger Hot-Sync theo chuẩn Windows 11.
+                  {getTabSubtitle()}
                 </p>
               </div>
 
@@ -352,8 +377,10 @@ export const App: React.FC = () => {
             )}
 
             {currentTab === 'sync-studio' && <SyncStudioView />}
-            {currentTab === 'docker' && <DockerView />}
+            {currentTab === 'logs' && <UnifiedLogsView />}
             {currentTab === 'git' && <GitWorkspacesView />}
+            {currentTab === 'docker' && <DockerView />}
+            {currentTab === 'tuning' && <WindowsPerformanceView />}
             {currentTab === 'settings' && <SettingsView />}
           </div>
         </main>
