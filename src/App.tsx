@@ -1,7 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { WindowsTitleBar } from './components/WindowsTitleBar';
+import React, { useEffect, useState, useRef } from 'react';
 import { NavigationRail, NavTab } from './components/NavigationRail';
-import { CommandBar } from './components/CommandBar';
 import { FluentStatCards } from './components/FluentStatCards';
 import { ProjectCard } from './components/ProjectCard';
 import { ProjectTableView } from './components/ProjectTableView';
@@ -33,17 +31,19 @@ import { UnifiedLogsView } from './components/UnifiedLogsView';
 import { WindowsPerformanceView } from './components/WindowsPerformanceView';
 import { SettingsView } from './components/SettingsView';
 import { useAppStore } from './store/useAppStore';
-import { Plus, FolderGit2, Zap } from 'lucide-react';
+import { Plus, FolderGit2, Zap, Search, List, LayoutGrid } from 'lucide-react';
 
 export const App: React.FC = () => {
   const { 
     projects, 
     searchQuery, 
+    setSearchQuery,
     fetchProjects, 
     connectWebSocket, 
     setIsAddModalOpen,
     triggerSync,
     viewMode,
+    setViewMode,
     cycleTheme,
     isPortRadarOpen,
     setIsPortRadarOpen,
@@ -88,6 +88,7 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'running' | 'native' | 'docker'>('all');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -95,9 +96,22 @@ export const App: React.FC = () => {
     return () => disconnect();
   }, [fetchProjects, connectWebSocket]);
 
-  // Global Keyboard Shortcuts (Ctrl+Shift+T, Ctrl+Shift+S, Ctrl+Shift+P, Ctrl+Shift+W)
+  // Global Keyboard Shortcuts (Ctrl+K, Ctrl+Shift+T, Ctrl+Shift+S, Ctrl+Shift+P, Ctrl+Shift+W)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl + K (or Cmd + K): Focus Search Input
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (currentTab !== 'dashboard') {
+          setCurrentTab('dashboard');
+        }
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+          searchInputRef.current?.select();
+        }, 50);
+        return;
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
         // Ctrl + Shift + T: Cycle Themes
         if (e.key.toLowerCase() === 't') {
@@ -188,7 +202,8 @@ export const App: React.FC = () => {
     isMiniMode, 
     isNewProjectOpen, 
     activeCopilot.isOpen, 
-    projects
+    projects,
+    currentTab
   ]);
 
   // Sync All active apps
@@ -254,40 +269,132 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-hub-canvas text-hub-primary font-['Segoe_UI_Variable_Text','Segoe_UI',system-ui,sans-serif] select-none transition-colors">
-      {/* 0. Windows 11 Native Titlebar */}
-      <WindowsTitleBar />
+    <div className="flex h-screen w-screen overflow-hidden bg-hub-canvas text-hub-primary font-['Segoe_UI_Variable_Text','Segoe_UI',system-ui,sans-serif] select-none transition-colors">
+      {/* 1. Left Navigation Rail (Fluent 2) */}
+      <NavigationRail
+        currentTab={currentTab}
+        onTabChange={setCurrentTab}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* 1. Left Navigation Rail (Fluent 2) */}
-        <NavigationRail
-          currentTab={currentTab}
-          onTabChange={setCurrentTab}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        />
-
-        {/* 2. Main Content Canvas */}
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Top CommandBar with Segmented Theme Switch & View Mode */}
-          <CommandBar
-            title={getTabTitle()}
-            onSyncAll={handleSyncAll}
-            showViewModeToggle={currentTab === 'dashboard'}
-          />
-
-          {/* Scrollable Viewport - Fluent 2 Dev Home Standard Spacing (px-8 py-6) */}
-          <main className="flex-1 overflow-y-auto px-8 py-6 bg-hub-canvas transition-colors w-full">
-            <div className="w-full pb-16">
-              {/* Dev Home Header Title */}
-              <div className="mb-4">
-                <h1 className="text-[24px] font-semibold text-hub-primary tracking-tight leading-tight">
-                  {getTabTitle()}
-                </h1>
-                <p className="text-[13px] text-hub-secondary mt-0.5">
+      {/* 2. Main Content Canvas */}
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+        {/* Scrollable Viewport - Fluent 2 Dev Home Standard Spacing (px-8 py-6) */}
+        <main className="flex-1 overflow-y-auto px-8 py-6 bg-hub-canvas transition-colors w-full">
+          <div className="w-full pb-16">
+            {/* Dev Home Header Title & Dashboard Action Toolbar */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-[24px] font-semibold text-hub-primary tracking-tight leading-tight">
+                    {getTabTitle()}
+                  </h1>
+                  {currentTab === 'dashboard' && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border border-hub bg-hub-card">
+                      {projects.filter(p => p.status === 'running').length > 0 ? (
+                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                          {projects.filter(p => p.status === 'running').length} Đang chạy
+                        </span>
+                      ) : (
+                        <span className="text-hub-muted font-medium">Sẵn sàng</span>
+                      )}
+                      <span className="text-hub-muted/40">•</span>
+                      <span className="text-hub-muted font-mono">{projects.length} Apps</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[13px] text-hub-secondary mt-1">
                   {getTabSubtitle()}
                 </p>
               </div>
+
+              {currentTab === 'dashboard' && (
+                <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                  {/* Search Bar */}
+                  <div className="relative w-64 md:w-72">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-hub-muted" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Tìm kiếm ứng dụng... (Ctrl+K)"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setSearchQuery('');
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                      className="h-8.5 w-full rounded-md border border-hub border-b-[2px] border-b-neutral-400 dark:border-b-neutral-500 bg-hub-card pl-8 pr-8 text-[13px] text-hub-primary placeholder:text-hub-muted focus:border-b-[var(--hub-accent)] focus:outline-none transition-all shadow-2xs"
+                    />
+                    {searchQuery ? (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-hub-muted hover:text-hub-primary text-xs"
+                      >
+                        ✕
+                      </button>
+                    ) : (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-hub-muted/70 font-mono border border-hub rounded px-1 hidden sm:inline">
+                        Ctrl+K
+                      </span>
+                    )}
+                  </div>
+
+                  {/* View Mode Toggle: Grid vs Table */}
+                  <div className="flex items-center rounded-md border border-hub bg-black/[0.02] dark:bg-white/[0.03] p-0.5 text-[12px]">
+                    <button
+                      onClick={() => setViewMode('table')}
+                      className={`flex items-center gap-1.5 rounded-[4px] px-2.5 h-7.5 font-medium transition-all ${
+                        viewMode === 'table'
+                          ? 'bg-hub-card text-[var(--hub-accent)] font-semibold shadow-2xs'
+                          : 'text-hub-muted hover:text-hub-primary'
+                      }`}
+                      title="Dạng bảng dữ liệu tối ưu không gian hiển thị"
+                    >
+                      <List className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Bảng</span>
+                    </button>
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`flex items-center gap-1.5 rounded-[4px] px-2.5 h-7.5 font-medium transition-all ${
+                        viewMode === 'grid'
+                          ? 'bg-hub-card text-[var(--hub-accent)] font-semibold shadow-2xs'
+                          : 'text-hub-muted hover:text-hub-primary'
+                      }`}
+                      title="Dạng lưới thẻ trực quan"
+                    >
+                      <LayoutGrid className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Thẻ</span>
+                    </button>
+                  </div>
+
+                  {/* Trigger Sync All Button */}
+                  {projects.filter(p => p.status === 'running').length > 0 && (
+                    <button
+                      onClick={handleSyncAll}
+                      className="fluent-btn-standard flex h-8.5 items-center gap-1.5 px-2.5 text-[12.5px] font-semibold text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-all shadow-xs"
+                      title="Kích hoạt Hot-Sync đồng bộ mã nguồn cho các ứng dụng đang chạy"
+                    >
+                      <Zap className="h-3.5 w-3.5 fill-current" />
+                      <span>Sync All ({projects.filter(p => p.status === 'running').length})</span>
+                    </button>
+                  )}
+
+                  {/* Primary Action Button: + Thêm ứng dụng */}
+                  <button
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="fluent-btn-primary flex h-8.5 items-center gap-1.5 px-3 text-[13px] font-semibold shadow-xs"
+                    title="Thêm hoặc liên kết ứng dụng mới"
+                  >
+                    <Plus className="h-4 w-4 stroke-[2.5]" />
+                    <span>Thêm ứng dụng</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
               {currentTab === 'dashboard' && (
                 <>
@@ -384,7 +491,6 @@ export const App: React.FC = () => {
             {currentTab === 'settings' && <SettingsView />}
           </div>
         </main>
-      </div>
       </div>
 
       {/* Dockable Console Logs Drawer */}
