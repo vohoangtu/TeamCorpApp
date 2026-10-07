@@ -27,6 +27,7 @@ import { folderChooserService } from './folder-chooser';
 import { logAggregator } from './log-aggregator';
 import { gitMatrixService } from './git-matrix';
 import { windowsTuningService } from './windows-tuning';
+import { meshDiscovery } from './mesh-discovery';
 import type { CreateProjectPayload, Project, LogEntry, ProcessPriority } from '../src/types';
 
 const PORT = 4100;
@@ -54,6 +55,8 @@ healthSentinel.setBroadcast(broadcast);
 resourceMonitor.setBroadcast(broadcast);
 resourceMonitor.startPolling(3000);
 logAggregator.setBroadcast(broadcast);
+meshDiscovery.setBroadcast(broadcast);
+meshDiscovery.start();
 
 let lastCpuMeasure = os.cpus();
 function calculateCpuUsage(): number {
@@ -101,6 +104,8 @@ wss.on('connection', async (ws) => {
 
   // Send initial data
   ws.send(JSON.stringify({ type: 'projects:all', payload: projectStore.getAll() }));
+  ws.send(JSON.stringify({ type: 'mesh:nodes_updated', payload: meshDiscovery.getAllNodes() }));
+  ws.send(JSON.stringify({ type: 'mesh:catalog_updated', payload: meshDiscovery.getTeamCatalog() }));
 
   // Send system stats immediately
   try {
@@ -962,6 +967,36 @@ server.on('request', async (req, res) => {
       const report = await windowsTuningService.auditDevDrives();
       res.writeHead(200);
       res.end(JSON.stringify(report));
+      return;
+    }
+
+    // =========================================================================
+    // 🌐 PILLAR 6: TEAM MESH & PEER DISCOVERY (LAN/WLAN & TAILSCALE)
+    // =========================================================================
+    if (pathname === '/api/mesh/nodes' && method === 'GET') {
+      res.writeHead(200);
+      res.end(JSON.stringify(meshDiscovery.getAllNodes()));
+      return;
+    }
+
+    if (pathname === '/api/mesh/shared-apps' && method === 'GET') {
+      res.writeHead(200);
+      res.end(JSON.stringify(meshDiscovery.getSharedProjects(false)));
+      return;
+    }
+
+    if (pathname === '/api/mesh/catalog' && method === 'GET') {
+      res.writeHead(200);
+      res.end(JSON.stringify(meshDiscovery.getTeamCatalog()));
+      return;
+    }
+
+    if (pathname.startsWith('/api/mesh/projects/') && pathname.endsWith('/share') && method === 'POST') {
+      const parts = pathname.split('/');
+      const projectId = parts[4];
+      const shared = meshDiscovery.toggleProjectShare(projectId);
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, shared }));
       return;
     }
 

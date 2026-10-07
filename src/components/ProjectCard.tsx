@@ -22,7 +22,10 @@ import {
   MoreHorizontal,
   ShieldAlert,
   ChevronDown,
-  Check
+  Check,
+  Share2,
+  Wifi,
+  Globe
 } from 'lucide-react';
 import type { Project } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -52,6 +55,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
     sentinelHealth,
     switchProjectTarget,
     setActiveResourceInspectorProject,
+    toggleProjectShare,
   } = useAppStore();
 
   const isSelected = activeProjectId === project.id;
@@ -229,15 +233,50 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
                 <span>DOWN</span>
               </span>
             )}
+
+            {/* Team Mesh Node Badge */}
+            {project.isRemote && (
+              <span
+                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold border ${
+                  project.connectionType === 'lan'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                    : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                }`}
+                title={`Chạy trên máy: ${project.nodeName}`}
+              >
+                {project.connectionType === 'lan' ? (
+                  <Wifi className="h-3 w-3" />
+                ) : (
+                  <Globe className="h-3 w-3" />
+                )}
+                <span>{project.nodeName || 'Remote'}</span>
+              </span>
+            )}
+
+            {/* Team Mesh Sharing Toggle for local projects */}
+            {!project.isRemote && (
+              <button
+                onClick={() => toggleProjectShare(project.id)}
+                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium border transition-colors ${
+                  project.shareToTeam !== false
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                    : 'bg-black/[0.03] dark:bg-white/[0.04] text-hub-muted border-hub hover:text-hub-primary'
+                }`}
+                title={project.shareToTeam !== false ? "Đang chia sẻ với Team Mesh (Nhấp để tắt)" : "Chia sẻ ứng dụng này với Team Mesh (Nhấp để bật)"}
+              >
+                <Share2 className="h-3 w-3" />
+                <span className="hidden sm:inline">{project.shareToTeam !== false ? 'Shared' : 'Private'}</span>
+              </button>
+            )}
           </div>
 
           {project.port && (
             <a
-              href={`http://localhost:${project.port}`}
+              href={project.remoteUrl || `http://localhost:${project.port}`}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1 rounded-md border border-[#0F6CBD]/30 bg-[#0F6CBD]/10 hover:bg-[#0F6CBD]/20 px-2 py-0.5 text-xs font-semibold text-[#0F6CBD] dark:text-[#479EF5] transition-colors shrink-0"
-              title="Mở cổng trên trình duyệt"
+              title={project.isRemote ? `Mở cổng từ xa trên máy ${project.nodeName}` : "Mở cổng trên trình duyệt"}
             >
               <span>:{project.port}</span>
               <ExternalLink className="h-3 w-3" />

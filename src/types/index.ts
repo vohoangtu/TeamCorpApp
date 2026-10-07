@@ -24,6 +24,14 @@ export interface Project {
   cpuPercent?: number;
   memoryMb?: number;
   createdAt: string;
+
+  // Team Mesh Extension properties
+  shareToTeam?: boolean;
+  nodeId?: string;
+  nodeName?: string;
+  isRemote?: boolean;
+  remoteUrl?: string;
+  connectionType?: 'local' | 'lan' | 'remote_tailscale';
 }
 
 export interface DeploymentRecord {
@@ -411,6 +419,19 @@ export interface DevDriveAuditReport {
   guideUrl: string;
 }
 
-
-
-
+// Pillar 6: Team Mesh & Peer Discovery
+export interface MeshNode {
+  id: string;
+  name: string;
+  hostname: string;
+  username: string;
+  ip: string;
+  port: number;
+  connectionType: 'local' | 'lan' | 'remote_tailscale';
+  status: 'online' | 'offline';
+  lastSeen: number;
+  latencyMs?: number;
+  sharedAppCount: number;
+  isSelf?: boolean;
+  apps?: Project[];
+}

@@ -22,7 +22,10 @@ import {
   MoreHorizontal,
   ShieldAlert,
   ChevronDown,
-  Check
+  Check,
+  Share2,
+  Wifi,
+  Globe
 } from 'lucide-react';
 import type { Project } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -52,6 +55,7 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
     sentinelHealth,
     switchProjectTarget,
     setActiveResourceInspectorProject,
+    toggleProjectShare,
   } = useAppStore();
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -130,10 +134,42 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
                     )}
                   </td>
 
-                  {/* App Name & PID */}
+                  {/* App Name & PID & Node Badge */}
                   <td className="py-2.5 px-3.5">
-                    <div className="font-bold text-sm text-neutral-900 dark:text-white truncate max-w-[240px]" title={project.name}>
-                      {project.name}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-sm text-neutral-900 dark:text-white truncate max-w-[200px]" title={project.name}>
+                        {project.name}
+                      </span>
+
+                      {/* Remote Mesh Node Badge */}
+                      {project.isRemote && (
+                        <span
+                          className={`inline-flex items-center gap-1 rounded px-1.5 py-0.2 text-[10px] font-semibold border ${
+                            project.connectionType === 'lan'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                              : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                          }`}
+                          title={`Máy chủ: ${project.nodeName}`}
+                        >
+                          {project.connectionType === 'lan' ? <Wifi className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
+                          <span>{project.nodeName || 'Remote'}</span>
+                        </span>
+                      )}
+
+                      {/* Local Team Share Toggle */}
+                      {!project.isRemote && (
+                        <button
+                          onClick={() => toggleProjectShare(project.id)}
+                          className={`p-1 rounded text-xs transition-colors ${
+                            project.shareToTeam !== false
+                              ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
+                              : 'text-hub-muted hover:text-hub-primary hover:bg-black/[0.04]'
+                          }`}
+                          title={project.shareToTeam !== false ? "Đang chia sẻ với Team Mesh (Click để tắt)" : "Chia sẻ với Team Mesh (Click để bật)"}
+                        >
+                          <Share2 className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                     {project.pid && (
                       <span className="text-xs font-mono text-[#0E7A0D] dark:text-[#58B957] flex items-center gap-1 mt-0.5">
@@ -279,10 +315,11 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
                   <td className="py-2.5 px-3.5 whitespace-nowrap">
                     {project.port ? (
                       <a
-                        href={`http://localhost:${project.port}`}
+                        href={project.remoteUrl || `http://localhost:${project.port}`}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 text-[#0F6CBD] dark:text-[#479EF5] text-sm font-semibold hover:underline"
+                        title={project.isRemote ? `Mở cổng từ xa trên máy ${project.nodeName}` : 'Mở cổng trên trình duyệt'}
                       >
                         :{project.port}
                         <ExternalLink className="h-3.5 w-3.5" />

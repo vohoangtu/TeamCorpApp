@@ -14,13 +14,23 @@ import type {
   GitMatrixBatchResult,
   ProcessPriority,
   ProjectProcessPriority,
-  DevDriveAuditReport
+  DevDriveAuditReport,
+  MeshNode
 } from '../types';
 import { type ThemeId, THEMES, THEME_LIST, applyThemeToDocument, getStoredThemeId } from '../themes';
 import { type MaterialType, MATERIALS, MATERIAL_LIST, applyMaterialToDocument, getStoredMaterialType } from '../materials';
 import { NotificationService } from '../utils/notifications';
 
 interface AppState {
+  // Pillar 6: Team Mesh & Peer Discovery
+  meshNodes: MeshNode[];
+  activeNodeFilter: string;
+  teamCatalog: Project[];
+  setActiveNodeFilter: (nodeFilter: string) => void;
+  fetchMeshNodes: () => Promise<void>;
+  fetchTeamCatalog: () => Promise<void>;
+  toggleProjectShare: (projectId: string) => Promise<boolean>;
+
   projects: Project[];
   activeProjectId: string | null;
   logs: Record<string, LogEntry[]>;
@@ -150,6 +160,11 @@ const getInitialViewMode = (): 'grid' | 'table' => {
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
+  meshNodes: [],
+  activeNodeFilter: 'all',
+  teamCatalog: [],
+  setActiveNodeFilter: (filter) => set({ activeNodeFilter: filter }),
+
   projects: [],
   activeProjectId: null,
   logs: {},
@@ -572,6 +587,52 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  fetchMeshNodes: async () => {
+    try {
+      const res = await fetch('/api/mesh/nodes');
+      if (res.ok) {
+        const data = await res.json();
+        set({ meshNodes: data });
+      }
+    } catch (e) {
+      console.error('Failed to fetch mesh nodes', e);
+    }
+  },
+
+  fetchTeamCatalog: async () => {
+    try {
+      const res = await fetch('/api/mesh/catalog');
+      if (res.ok) {
+        const data = await res.json();
+        set({ teamCatalog: data });
+      }
+    } catch (e) {
+      console.error('Failed to fetch team catalog', e);
+    }
+  },
+
+  toggleProjectShare: async (projectId: string) => {
+    try {
+      const res = await fetch(`/api/mesh/projects/${projectId}/share`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        set((state) => ({
+          projects: state.projects.map((p) => (p.id === projectId ? { ...p, shareToTeam: data.shared } : p)),
+        }));
+        NotificationService.notify(data.shared ? 'Đã chia sẻ với Team' : 'Đã hủy chia sẻ', {
+          body: data.shared
+            ? 'Dự án đã sẵn sàng cho đồng đội truy cập trong mạng Mesh.'
+            : 'Dự án đã chuyển về chế độ riêng tư.',
+        });
+        get().fetchTeamCatalog();
+        return data.shared;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
+
   connectWebSocket: () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -585,6 +646,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ isConnected: true });
         get().fetchProjects();
         get().fetchDeployments();
+        get().fetchMeshNodes();
+        get().fetchTeamCatalog();
       };
 
       socket.onmessage = (event) => {
@@ -639,6 +702,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             get().addAggregatedLog(msg.payload);
           } else if (msg.type === 'log:aggregated_cleared') {
             set({ aggregatedLogs: [] });
+          } else if (msg.type === 'mesh:nodes_updated' || msg.type === 'mesh:nodes_all') {
+            set({ meshNodes: msg.payload });
+          } else if (msg.type === 'mesh:catalog_updated' || msg.type === 'mesh:catalog_all') {
+            set({ teamCatalog: msg.payload });
           }
         } catch (e) {
           console.error('WS parse error', e);

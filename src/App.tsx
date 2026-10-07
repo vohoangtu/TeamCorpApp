@@ -30,6 +30,7 @@ import { GitWorkspacesView } from './components/GitWorkspacesView';
 import { UnifiedLogsView } from './components/UnifiedLogsView';
 import { WindowsPerformanceView } from './components/WindowsPerformanceView';
 import { SettingsView } from './components/SettingsView';
+import { MeshNodeSelector } from './components/MeshNodeSelector';
 import { useAppStore } from './store/useAppStore';
 import { Plus, FolderGit2, Zap, Search, List, LayoutGrid } from 'lucide-react';
 
@@ -45,6 +46,11 @@ export const App: React.FC = () => {
     viewMode,
     setViewMode,
     cycleTheme,
+    meshNodes,
+    activeNodeFilter,
+    teamCatalog,
+    fetchMeshNodes,
+    fetchTeamCatalog,
     isPortRadarOpen,
     setIsPortRadarOpen,
     isWorkspacesOpen,
@@ -92,9 +98,11 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     fetchProjects();
+    fetchMeshNodes();
+    fetchTeamCatalog();
     const disconnect = connectWebSocket();
     return () => disconnect();
-  }, [fetchProjects, connectWebSocket]);
+  }, [fetchProjects, fetchMeshNodes, fetchTeamCatalog, connectWebSocket]);
 
   // Global Keyboard Shortcuts (Ctrl+K, Ctrl+Shift+T, Ctrl+Shift+S, Ctrl+Shift+P, Ctrl+Shift+W)
   useEffect(() => {
@@ -215,11 +223,20 @@ export const App: React.FC = () => {
     }
   };
 
+  // Source projects based on active node filter
+  const sourceProjects =
+    activeNodeFilter === 'local'
+      ? projects
+      : activeNodeFilter === 'all'
+      ? (teamCatalog.length > 0 ? teamCatalog : projects)
+      : teamCatalog.filter((p) => p.nodeId === activeNodeFilter);
+
   // Filter projects for dashboard view
-  const filteredProjects = projects.filter((project) => {
+  const filteredProjects = sourceProjects.filter((project) => {
     const matchesSearch =
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.sourcePath.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (project.sourcePath && project.sourcePath.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (project.nodeName && project.nodeName.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (project.port && project.port.toString().includes(searchQuery));
 
     if (!matchesSearch) return false;
@@ -398,6 +415,9 @@ export const App: React.FC = () => {
 
               {currentTab === 'dashboard' && (
                 <>
+                  {/* Mesh Peer Discovery & Node Selector Bar */}
+                  <MeshNodeSelector />
+
                   {/* Fluent 2 Telemetry Tiles */}
                   <FluentStatCards />
 
@@ -412,7 +432,7 @@ export const App: React.FC = () => {
                             : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
                         }`}
                       >
-                        Tất cả ({projects.length})
+                        Tất cả ({sourceProjects.length})
                       </button>
                       <button
                         onClick={() => setActiveFilter('running')}
@@ -422,7 +442,7 @@ export const App: React.FC = () => {
                             : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
                         }`}
                       >
-                        Đang chạy ({projects.filter((p) => p.status === 'running').length})
+                        Đang chạy ({sourceProjects.filter((p) => p.status === 'running').length})
                       </button>
                     <button
                       onClick={() => setActiveFilter('native')}
