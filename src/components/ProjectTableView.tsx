@@ -381,6 +381,19 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
                           <RotateCw className={`h-3.5 w-3.5 ${remoteActingId === project.id ? 'animate-spin' : ''}`} />
                         </button>
 
+                        {/* Remote Action: View Logs Terminal */}
+                        <button
+                          onClick={() => setActiveProject(project.id)}
+                          className={`fluent-icon-btn h-7 w-7 ${
+                            isSelected
+                              ? 'border-[var(--hub-accent)] text-[var(--hub-accent)] bg-[var(--hub-accent)]/10'
+                              : 'text-sky-600 dark:text-sky-400 hover:bg-sky-500/10'
+                          }`}
+                          title={`Xem Console Logs từ xa (${project.nodeName || 'Peer'})`}
+                        >
+                          <Terminal className="h-3.5 w-3.5" />
+                        </button>
+
                         {/* Direct Web Opening */}
                         {project.remoteUrl && (
                           <a

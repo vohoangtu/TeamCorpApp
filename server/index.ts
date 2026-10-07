@@ -235,6 +235,7 @@ function parseBody<T>(req: http.IncomingMessage): Promise<T> {
 // REST Request handler
 server.on('request', async (req, res) => {
   const parsedUrl = new URL(req.url || '', `http://${req.headers.host}`);
+  const url = parsedUrl;
   const pathname = parsedUrl.pathname;
   const method = req.method?.toUpperCase();
 
@@ -728,8 +729,20 @@ server.on('request', async (req, res) => {
         return;
       }
       if (method === 'POST') {
-        const body = await parseBody<{ domain: string; targetPort: number }>(req);
-        const route = proxyManager.addRoute(body.domain, body.targetPort);
+        const body = await parseBody<{
+          domain: string;
+          targetPort: number;
+          targetHost?: string;
+          isRemote?: boolean;
+          nodeName?: string;
+        }>(req);
+        const route = proxyManager.addRoute(
+          body.domain,
+          body.targetPort,
+          body.targetHost,
+          body.isRemote,
+          body.nodeName
+        );
         res.writeHead(201);
         res.end(JSON.stringify(route));
         return;
@@ -748,9 +761,10 @@ server.on('request', async (req, res) => {
     // GET /api/proxy/hosts-command
     if (method === 'GET' && pathname === '/api/proxy/hosts-command') {
       const domain = url.searchParams.get('domain') || 'app.local';
-      const cmd = proxyManager.getWindowsHostsCommand(domain);
+      const targetHost = url.searchParams.get('targetHost') || undefined;
+      const cmd = proxyManager.getWindowsHostsCommand(domain, targetHost);
       res.writeHead(200);
-      res.end(JSON.stringify({ domain, command: cmd }));
+      res.end(JSON.stringify({ domain, targetHost, command: cmd }));
       return;
     }
 
@@ -1174,6 +1188,40 @@ server.on('request', async (req, res) => {
       const result = await meshDiscovery.dispatchActionToPeer(targetNodeId, body.projectId, body.action);
       res.writeHead(result.success ? 200 : 400);
       res.end(JSON.stringify(result));
+      return;
+    }
+
+    // Phase 4: Host endpoint - serve project logs to authenticated mesh peer
+    const meshProjectLogsMatch = pathname.match(/^\/api\/mesh\/projects\/([^/]+)\/logs$/);
+    if (meshProjectLogsMatch && method === 'GET') {
+      const targetProjectId = meshProjectLogsMatch[1];
+      const token = req.headers['x-mesh-token'] as string;
+      if (meshDiscovery.getConfig().requireToken && token !== meshDiscovery.getConfig().teamToken) {
+        res.writeHead(403);
+        res.end(JSON.stringify({ error: 'Team Token xác thực không hợp lệ' }));
+        return;
+      }
+      const rawLogs = logAggregator.getLogs({ projectIds: [targetProjectId], limit: 250 });
+      const logs = rawLogs.map((entry) => ({
+        id: entry.id,
+        projectId: entry.projectId,
+        timestamp: entry.timestamp,
+        stream: entry.stream,
+        text: entry.message,
+      }));
+      res.writeHead(200);
+      res.end(JSON.stringify(logs));
+      return;
+    }
+
+    // Phase 4: Local proxy endpoint - fetch project logs from remote peer
+    const nodeProjectLogsMatch = pathname.match(/^\/api\/mesh\/nodes\/([^/]+)\/projects\/([^/]+)\/logs$/);
+    if (nodeProjectLogsMatch && method === 'GET') {
+      const targetNodeId = nodeProjectLogsMatch[1];
+      const targetProjectId = nodeProjectLogsMatch[2];
+      const logs = await meshDiscovery.fetchPeerProjectLogs(targetNodeId, targetProjectId);
+      res.writeHead(200);
+      res.end(JSON.stringify(logs));
       return;
     }
 

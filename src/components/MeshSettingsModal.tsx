@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   KeyRound, 
@@ -8,14 +8,15 @@ import {
   RefreshCw, 
   History, 
   Laptop, 
-  Wifi, 
-  Globe, 
-  AlertTriangle,
-  Lock,
-  Unlock,
-  Radio
+  Lock, 
+  Radio,
+  Download,
+  Upload,
+  FileJson,
+  Users
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { sendFluentToast } from '../utils/notifications';
 
 export const MeshSettingsModal: React.FC = () => {
   const { 
@@ -34,6 +35,7 @@ export const MeshSettingsModal: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showToken, setShowToken] = useState(false);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const selfNode = meshNodes.find((n) => n.isSelf || n.connectionType === 'local');
 
   useEffect(() => {
@@ -74,12 +76,82 @@ export const MeshSettingsModal: React.FC = () => {
     }, 400);
   };
 
+  const handleExportProfile = () => {
+    const profile = {
+      format: 'windev-team-mesh-profile',
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      teamToken: token.trim(),
+      requireToken,
+      allowRemoteControl: allowRemote,
+      clusterLeadNode: selfNode?.hostname || 'developer-pc',
+      recommendedSubnets: ['192.168.0.0/16', '10.0.0.0/8', '100.64.0.0/10'],
+    };
+
+    const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `windev-team-profile-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    sendFluentToast('Đã Xuất Hồ Sơ', 'Tệp cấu hình nhóm đã được tải xuống (.json).', 'success');
+  };
+
+  const handleImportProfile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        if (!parsed.teamToken) {
+          sendFluentToast('Tệp không hợp lệ', 'Không tìm thấy thông tin teamToken trong file cấu hình.', 'error');
+          return;
+        }
+
+        setToken(parsed.teamToken);
+        if (parsed.requireToken !== undefined) setRequireToken(parsed.requireToken);
+        if (parsed.allowRemoteControl !== undefined) setAllowRemote(parsed.allowRemoteControl);
+
+        await updateMeshConfig({
+          teamToken: parsed.teamToken,
+          requireToken: parsed.requireToken !== undefined ? parsed.requireToken : true,
+          allowRemoteControl: parsed.allowRemoteControl !== undefined ? parsed.allowRemoteControl : true,
+        });
+
+        sendFluentToast(
+          'Đã Nhập Hồ Sơ Nhóm Thành Công', 
+          `Đã áp dụng cấu hình từ ${parsed.clusterLeadNode || 'đồng đội'}. Máy bạn đã gia nhập Team Mesh!`, 
+          'success'
+        );
+      } catch (err: any) {
+        sendFluentToast('Lỗi đọc tệp', err.message || 'Không thể đọc nội dung file JSON.', 'error');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-5xl 2xl:max-w-none 2xl:w-[80vw] 2xl:h-[90vh] max-h-[92vh] flex flex-col rounded-2xl bg-hub-card border border-hub shadow-2xl overflow-hidden backdrop-blur-2xl"
+        className="w-full max-w-5xl rounded-xl border border-hub bg-hub-card shadow-2xl overflow-hidden flex flex-col max-h-[88vh] min-[1440px]:w-[80vw] min-[1440px]:max-w-[80vw] min-[1440px]:h-[90vh] min-[1440px]:max-h-[90vh] modal-extension-large backdrop-blur-2xl"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Hidden File Input for Profile Import */}
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          accept=".json" 
+          onChange={handleImportProfile} 
+          className="hidden" 
+        />
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-hub bg-hub-card/80">
           <div className="flex items-center gap-3">
@@ -88,10 +160,10 @@ export const MeshSettingsModal: React.FC = () => {
             </div>
             <div>
               <h2 className="text-base font-bold text-hub-primary">
-                Cấu Hình Bảo Mật Team Mesh & Phân Quyền
+                Cấu Hình Bảo Mật Team Mesh & Onboarding Nhóm
               </h2>
               <p className="text-xs text-hub-muted mt-0.5">
-                Quản lý mã bí mật Team Token, chính sách cho phép điều khiển từ xa và định danh trạm nội bộ
+                Quản lý mã bí mật Team Token, phân quyền điều khiển từ xa và xuất/nhập hồ sơ nhóm cho thành viên mới
               </p>
             </div>
           </div>
@@ -105,7 +177,7 @@ export const MeshSettingsModal: React.FC = () => {
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Section 1: Team Secret Token */}
           <div className="rounded-xl border border-hub bg-black/[0.02] dark:bg-white/[0.02] p-5">
             <div className="flex items-center justify-between mb-3">
@@ -121,7 +193,7 @@ export const MeshSettingsModal: React.FC = () => {
             </div>
 
             <p className="text-xs text-hub-muted mb-4 leading-relaxed">
-              Mã khóa bí mật này phải được chia sẻ giống nhau giữa các thành viên cùng làm việc (qua mạng LAN/Wi-Fi hoặc VPN). Mọi yêu cầu gửi lệnh điều khiển (Restart/Sync) từ xa sẽ bắt buộc xác thực qua mã khóa này.
+              Mã khóa bí mật này phải được chia sẻ giống nhau giữa các thành viên cùng làm việc (qua mạng LAN/Wi-Fi hoặc VPN). Mọi yêu cầu gửi lệnh điều khiển (Restart/Sync) hoặc stream log từ xa sẽ bắt buộc xác thực qua mã khóa này.
             </p>
 
             <div className="flex items-center gap-2">
@@ -171,7 +243,7 @@ export const MeshSettingsModal: React.FC = () => {
               </h3>
             </div>
 
-            <div className="space-y-4 pt-1">
+            <div className="space-y-3.5 pt-1">
               {/* Toggle 1: Allow Remote Control */}
               <div className="flex items-start justify-between gap-4 p-3.5 rounded-lg border border-hub bg-hub-card">
                 <div>
@@ -228,7 +300,40 @@ export const MeshSettingsModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 3: Node Identity Specs */}
+          {/* Section 3: Team Workspace Profile (Quick Onboarding) */}
+          <div className="rounded-xl border border-hub bg-black/[0.02] dark:bg-white/[0.02] p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="h-4 w-4 text-sky-500" />
+              <h3 className="text-sm font-bold text-hub-primary">
+                Hồ Sơ Nhóm & Onboarding Nhanh (Team Workspace Profile)
+              </h3>
+            </div>
+            <p className="text-xs text-hub-muted mb-4 leading-relaxed">
+              Xuất cấu hình này thành file <code>.json</code> để gửi cho thành viên mới trong team. Thành viên mới chỉ cần bấm "Nhập Hồ Sơ" để kết nối vào mạng Mesh trong 1 cú nhấp chuột mà không cần gõ token thủ công.
+            </p>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleExportProfile}
+                className="fluent-btn-standard h-9 px-4 text-xs font-semibold flex items-center gap-2"
+                title="Tải về file windev-team-profile.json"
+              >
+                <Download className="h-4 w-4 text-[var(--hub-accent)]" />
+                <span>Xuất Hồ Sơ Nhóm (.json)</span>
+              </button>
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="fluent-btn-standard h-9 px-4 text-xs font-semibold flex items-center gap-2"
+                title="Chọn file windev-team-profile.json để áp dụng cấu hình"
+              >
+                <Upload className="h-4 w-4 text-emerald-500" />
+                <span>Nhập Hồ Sơ Nhóm (Import)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Section 4: Node Identity Specs */}
           <div className="rounded-xl border border-hub bg-black/[0.02] dark:bg-white/[0.02] p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">

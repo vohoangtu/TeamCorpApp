@@ -188,6 +188,9 @@ export interface ProxyRoute {
   id: string;
   domain: string;
   targetPort: number;
+  targetHost?: string;
+  isRemote?: boolean;
+  nodeName?: string;
   enabled: boolean;
   createdAt: string;
 }

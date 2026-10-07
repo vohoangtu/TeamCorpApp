@@ -48,6 +48,7 @@ interface AppState {
     projectId: string,
     action: 'restart' | 'sync' | 'stop' | 'start'
   ) => Promise<{ success: boolean; message?: string; error?: string }>;
+  fetchRemoteProjectLogs: (nodeId: string, projectId: string) => Promise<LogEntry[]>;
 
   projects: Project[];
   activeProjectId: string | null;
@@ -736,6 +737,28 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: e.message || 'Không thể gửi lệnh qua mạng.',
       });
       return { success: false, error: e.message };
+    }
+  },
+
+  fetchRemoteProjectLogs: async (nodeId, projectId) => {
+    try {
+      const res = await fetch(`/api/mesh/nodes/${nodeId}/projects/${projectId}/logs`);
+      if (res.ok) {
+        const logs: LogEntry[] = await res.json();
+        if (Array.isArray(logs)) {
+          set((state) => ({
+            logs: {
+              ...state.logs,
+              [projectId]: logs,
+            },
+          }));
+          return logs;
+        }
+      }
+      return [];
+    } catch (e) {
+      console.error('Failed to fetch remote project logs', e);
+      return [];
     }
   },
 

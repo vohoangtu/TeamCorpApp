@@ -4,6 +4,9 @@ export interface ProxyRoute {
   id: string;
   domain: string;
   targetPort: number;
+  targetHost?: string;
+  isRemote?: boolean;
+  nodeName?: string;
   enabled: boolean;
   createdAt: string;
 }
@@ -14,6 +17,7 @@ export class ProxyManager {
       id: 'route-sample',
       domain: 'sample.local',
       targetPort: 3030,
+      targetHost: '127.0.0.1',
       enabled: true,
       createdAt: new Date().toISOString(),
     },
@@ -21,6 +25,7 @@ export class ProxyManager {
       id: 'route-api',
       domain: 'api.local',
       targetPort: 4100,
+      targetHost: '127.0.0.1',
       enabled: true,
       createdAt: new Date().toISOString(),
     },
@@ -30,11 +35,20 @@ export class ProxyManager {
     return this.routes;
   }
 
-  addRoute(domain: string, targetPort: number): ProxyRoute {
+  addRoute(
+    domain: string,
+    targetPort: number,
+    targetHost?: string,
+    isRemote?: boolean,
+    nodeName?: string
+  ): ProxyRoute {
     const newRoute: ProxyRoute = {
       id: `route-${Date.now()}`,
       domain: domain.toLowerCase().trim(),
       targetPort,
+      targetHost: targetHost || '127.0.0.1',
+      isRemote: !!isRemote,
+      nodeName: nodeName || undefined,
       enabled: true,
       createdAt: new Date().toISOString(),
     };
@@ -57,8 +71,9 @@ export class ProxyManager {
     return null;
   }
 
-  getWindowsHostsCommand(domain: string): string {
-    return `Add-Content -Path "$env:windir\\System32\\drivers\\etc\\hosts" -Value "127.0.0.1  ${domain}"`;
+  getWindowsHostsCommand(domain: string, targetHost?: string): string {
+    const host = targetHost && targetHost.trim() ? targetHost.trim() : '127.0.0.1';
+    return `Add-Content -Path "$env:windir\\System32\\drivers\\etc\\hosts" -Value "${host}  ${domain}"`;
   }
 }
 

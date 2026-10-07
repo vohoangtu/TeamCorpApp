@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { exec } from 'node:child_process';
-import type { MeshNode, Project, MeshConfig, MeshAuditLog } from '../src/types';
+import type { MeshNode, Project, MeshConfig, MeshAuditLog, LogEntry } from '../src/types';
 import { projectStore } from './store';
 
 const UDP_PORT = 4105;
@@ -297,6 +297,54 @@ export class MeshDiscoveryService {
       });
 
       req.write(payload);
+      req.end();
+    });
+  }
+
+  public async fetchPeerProjectLogs(targetNodeId: string, projectId: string): Promise<LogEntry[]> {
+    const peer = this.peers.get(targetNodeId);
+    if (!peer) {
+      return [];
+    }
+
+    return new Promise((resolve) => {
+      const options = {
+        hostname: peer.ip,
+        port: peer.port,
+        path: `/api/mesh/projects/${encodeURIComponent(projectId)}/logs`,
+        method: 'GET',
+        headers: {
+          'X-Mesh-Token': this.config.teamToken,
+          'X-Mesh-Actor-NodeId': this.hostId,
+          'X-Mesh-Actor-Hostname': os.hostname(),
+          'X-Mesh-Actor-Username': os.userInfo().username || 'developer',
+        },
+        timeout: 5000,
+      };
+
+      const req = http.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            if (Array.isArray(data)) {
+              resolve(data);
+            } else {
+              resolve([]);
+            }
+          } catch {
+            resolve([]);
+          }
+        });
+      });
+
+      req.on('error', () => resolve([]));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve([]);
+      });
+
       req.end();
     });
   }

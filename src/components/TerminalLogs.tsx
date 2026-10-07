@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Terminal, Trash2, X, Maximize2, Minimize2, Copy, Check, ArrowDownToLine, Sparkles } from 'lucide-react';
+import { Terminal, Trash2, X, Maximize2, Minimize2, Copy, Check, ArrowDownToLine, Sparkles, Radio } from 'lucide-react';
 import Convert from 'ansi-to-html';
 import { useAppStore } from '../store/useAppStore';
 
@@ -24,11 +24,13 @@ export const TerminalLogs: React.FC = () => {
   const { 
     activeProjectId, 
     projects, 
+    teamCatalog,
     logs, 
     clearLogs, 
     isTerminalOpen, 
     setIsTerminalOpen,
-    setActiveCopilot
+    setActiveCopilot,
+    fetchRemoteProjectLogs
   } = useAppStore();
 
   const [filter, setFilter] = useState<'all' | 'stdout' | 'stderr'>('all');
@@ -37,8 +39,23 @@ export const TerminalLogs: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  const activeProject = projects.find(p => p.id === activeProjectId);
+  const activeProject = 
+    projects.find((p) => p.id === activeProjectId) || 
+    teamCatalog.find((p) => p.id === activeProjectId);
   const projectLogs = (activeProjectId ? logs[activeProjectId] : []) || [];
+
+  // Live streaming polling for remote projects
+  useEffect(() => {
+    if (!isTerminalOpen || !activeProject?.isRemote || !activeProject.nodeId || !activeProjectId) return;
+
+    fetchRemoteProjectLogs(activeProject.nodeId, activeProjectId);
+
+    const interval = setInterval(() => {
+      fetchRemoteProjectLogs(activeProject.nodeId!, activeProjectId);
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [isTerminalOpen, activeProjectId, activeProject?.isRemote, activeProject?.nodeId, fetchRemoteProjectLogs]);
 
   const filteredLogs = projectLogs.filter(log => {
     if (filter === 'all') return true;
@@ -73,9 +90,20 @@ export const TerminalLogs: React.FC = () => {
             <Terminal className="h-4 w-4 text-sky-500 dark:text-sky-400" />
             <span className="text-xs font-bold text-slate-800 dark:text-white">Console Logs:</span>
             {activeProject ? (
-              <span className="rounded bg-sky-500/10 text-sky-700 border-sky-300 dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/30 px-2 py-0.5 text-xs font-semibold border">
-                {activeProject.name}
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="rounded bg-sky-500/10 text-sky-700 border-sky-300 dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/30 px-2 py-0.5 text-xs font-semibold border">
+                  {activeProject.name}
+                </span>
+                {activeProject.isRemote && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/30 px-2 py-0.5 text-[11px] font-semibold">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Remote: {activeProject.nodeName || 'Peer'}</span>
+                    <span className="text-[10px] opacity-75 font-mono">
+                      ({activeProject.connectionType === 'remote_tailscale' ? 'Tailscale' : 'LAN'})
+                    </span>
+                  </span>
+                )}
+              </div>
             ) : (
               <span className="text-xs text-slate-500 dark:text-slate-400 italic">Select an app to stream logs</span>
             )}
@@ -175,7 +203,11 @@ export const TerminalLogs: React.FC = () => {
         {filteredLogs.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
             <Terminal className="h-8 w-8 text-slate-700" />
-            <p>No log records captured yet. Start or Sync the app to stream stdout/stderr.</p>
+            <p className="text-center max-w-md">
+              {activeProject?.isRemote
+                ? `Đang lắng nghe luồng log từ trạm [${activeProject.nodeName || 'Remote'}]... Khi dịch vụ chạy trên máy đồng nghiệp, stdout/stderr sẽ hiển thị trực tiếp tại đây.`
+                : 'No log records captured yet. Start or Sync the app to stream stdout/stderr.'}
+            </p>
           </div>
         ) : (
           filteredLogs.map(log => (

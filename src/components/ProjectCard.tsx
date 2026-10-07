@@ -425,6 +425,19 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
                 <RotateCw className={`h-4 w-4 ${isRemoteActing ? 'animate-spin' : ''}`} />
               </button>
 
+              {/* Remote Action: View Logs Terminal */}
+              <button
+                onClick={() => setActiveProject(project.id)}
+                className={`fluent-icon-btn h-8 w-8 ${
+                  isSelected
+                    ? 'border-[var(--hub-accent)] text-[var(--hub-accent)] bg-[var(--hub-accent)]/10'
+                    : 'text-sky-600 dark:text-sky-400 hover:bg-sky-500/10'
+                }`}
+                title={`Xem Console Logs từ xa (${project.nodeName || 'Peer'})`}
+              >
+                <Terminal className="h-4 w-4" />
+              </button>
+
               {/* Direct Web Opening */}
               {project.remoteUrl && (
                 <a
