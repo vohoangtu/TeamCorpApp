@@ -28,7 +28,7 @@ import { logAggregator } from './log-aggregator';
 import { gitMatrixService } from './git-matrix';
 import { windowsTuningService } from './windows-tuning';
 import { meshDiscovery } from './mesh-discovery';
-import type { CreateProjectPayload, Project, LogEntry, ProcessPriority, MeshConfig, MeshAuditLog } from '../src/types';
+import type { CreateProjectPayload, Project, LogEntry, ProcessPriority, MeshConfig, MeshAuditLog, TeamPortClash } from '../src/types';
 
 const PORT = 4100;
 const server = http.createServer();
@@ -660,6 +660,46 @@ server.on('request', async (req, res) => {
       const result = await portManager.killPort(body.port);
       res.writeHead(result.success ? 200 : 400);
       res.end(JSON.stringify(result));
+      return;
+    }
+
+    // GET /api/ports/team-clashes (Phase 3: Cross-Node Port Radar)
+    if (method === 'GET' && pathname === '/api/ports/team-clashes') {
+      const allTeamProjects = meshDiscovery.getTeamCatalog();
+      const portMap = new Map<number, Array<{
+        id: string;
+        name: string;
+        nodeId?: string;
+        nodeName?: string;
+        isRemote?: boolean;
+        ip?: string;
+        status: string;
+      }>>();
+
+      for (const p of allTeamProjects) {
+        if (!p.port) continue;
+        const list = portMap.get(p.port) || [];
+        list.push({
+          id: p.id,
+          name: p.name,
+          nodeId: p.nodeId,
+          nodeName: p.nodeName,
+          isRemote: p.isRemote,
+          ip: p.remoteUrl ? (() => { try { return new URL(p.remoteUrl).hostname; } catch { return undefined; } })() : undefined,
+          status: p.status,
+        });
+        portMap.set(p.port, list);
+      }
+
+      const clashes: TeamPortClash[] = [];
+      for (const [port, projs] of portMap.entries()) {
+        if (projs.length > 1) {
+          clashes.push({ port, projects: projs });
+        }
+      }
+
+      res.writeHead(200);
+      res.end(JSON.stringify(clashes));
       return;
     }
 

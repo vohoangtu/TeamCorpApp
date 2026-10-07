@@ -276,6 +276,11 @@ export interface GraphNode {
   status: 'online' | 'offline' | 'degraded';
   icon: string;
   latencyMs?: number;
+  nodeId?: string;
+  nodeName?: string;
+  isRemote?: boolean;
+  connectionType?: 'local' | 'lan' | 'remote_tailscale';
+  ip?: string;
 }
 
 export interface GraphEdge {
@@ -283,8 +288,9 @@ export interface GraphEdge {
   source: string;
   target: string;
   label: string;
-  protocol: 'HTTP' | 'WebSocket' | 'TCP' | 'IPC';
+  protocol: 'HTTP' | 'WebSocket' | 'TCP' | 'IPC' | 'LAN Mesh' | 'Tailscale VPN';
   status: 'active' | 'inactive';
+  isCrossNode?: boolean;
 }
 
 export interface ArchitectureTopology {
@@ -294,7 +300,21 @@ export interface ArchitectureTopology {
     totalNodes: number;
     activeConnections: number;
     healthyPercent: number;
+    crossNodeConnections?: number;
   };
+}
+
+export interface TeamPortClash {
+  port: number;
+  projects: Array<{
+    id: string;
+    name: string;
+    nodeId?: string;
+    nodeName?: string;
+    isRemote?: boolean;
+    ip?: string;
+    status: string;
+  }>;
 }
 
 // --- 🩹 DEPENDENCY VULNERABILITY & LOCKFILE DOCTOR ---

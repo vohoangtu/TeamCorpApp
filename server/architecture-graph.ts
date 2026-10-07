@@ -2,47 +2,21 @@ import { projectStore } from './store';
 import { envManager } from './env-manager';
 import { dbInspector } from './db-inspector';
 import { healthSentinel } from './health-sentinel';
-
-export interface GraphNode {
-  id: string;
-  label: string;
-  subLabel: string;
-  category: 'frontend' | 'backend' | 'database' | 'cache' | 'service';
-  port?: number;
-  status: 'online' | 'offline' | 'degraded';
-  icon: string;
-  latencyMs?: number;
-}
-
-export interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  label: string;
-  protocol: 'HTTP' | 'WebSocket' | 'TCP' | 'IPC';
-  status: 'active' | 'inactive';
-}
-
-export interface ArchitectureTopology {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  stats: {
-    totalNodes: number;
-    activeConnections: number;
-    healthyPercent: number;
-  };
-}
+import { meshDiscovery } from './mesh-discovery';
+import type { GraphNode, GraphEdge, ArchitectureTopology } from '../src/types';
 
 export class ArchitectureGraphService {
   async getTopology(): Promise<ArchitectureTopology> {
-    const projects = projectStore.getAll();
+    const localProjects = projectStore.getAll();
+    const teamCatalog = meshDiscovery.getTeamCatalog();
+    const selfNode = meshDiscovery.getSelfNode();
     const healthMap = new Map(healthSentinel.getAllHealth().map((h) => [h.projectId, h]));
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];
     const dbMap = new Map<string, GraphNode>();
 
-    // 1. Create project nodes
-    for (const p of projects) {
+    // 1. Create Local Project Nodes
+    for (const p of localProjects) {
       const isRunning = p.status === 'running';
       const health = healthMap.get(p.id);
       
@@ -68,29 +42,52 @@ export class ArchitectureGraphService {
         status: isRunning ? (health?.status === 'degraded' ? 'degraded' : 'online') : 'offline',
         icon,
         latencyMs: health?.latencyMs || (isRunning ? 18 : undefined),
+        nodeId: selfNode.id,
+        nodeName: 'Máy của tôi (Local)',
+        isRemote: false,
+        connectionType: 'local',
+        ip: selfNode.ip,
       });
 
-      // 2. Parse .env to detect outgoing links
+      // Parse local .env to detect links
       const envData = envManager.getEnv(p.sourcePath);
       for (const item of envData.items) {
         const key = item.key.toUpperCase();
         const val = item.value;
 
-        // API Connection link (Frontend -> Backend)
+        // API Connection link (Frontend -> Backend Local or Remote Peer)
         if (key.includes('API_URL') || key.includes('BASE_URL') || key.includes('BACKEND')) {
           const portMatch = val.match(/:(\d{3,5})/);
           if (portMatch) {
             const targetPort = parseInt(portMatch[1], 10);
-            const targetProj = projects.find((x) => x.port === targetPort);
-            if (targetProj && targetProj.id !== p.id) {
+            
+            // Check local projects first
+            const targetLocal = localProjects.find((x) => x.port === targetPort);
+            if (targetLocal && targetLocal.id !== p.id) {
               edges.push({
-                id: `edge-${p.id}-${targetProj.id}`,
+                id: `edge-${p.id}-${targetLocal.id}`,
                 source: p.id,
-                target: targetProj.id,
-                label: 'REST API',
+                target: targetLocal.id,
+                label: 'REST API (Local)',
                 protocol: 'HTTP',
-                status: isRunning && targetProj.status === 'running' ? 'active' : 'inactive',
+                status: isRunning && targetLocal.status === 'running' ? 'active' : 'inactive',
+                isCrossNode: false,
               });
+            } else {
+              // Check remote peer services
+              const targetRemote = teamCatalog.find((x) => x.isRemote && x.nodeId !== selfNode.id && x.port === targetPort);
+              if (targetRemote) {
+                const isLan = targetRemote.connectionType === 'lan';
+                edges.push({
+                  id: `edge-${p.id}-remote-${targetRemote.id}`,
+                  source: p.id,
+                  target: `remote-${targetRemote.id}`,
+                  label: isLan ? 'LAN Mesh (<1ms)' : 'Tailscale VPN',
+                  protocol: isLan ? 'LAN Mesh' : 'Tailscale VPN',
+                  status: isRunning && targetRemote.status === 'running' ? 'active' : 'inactive',
+                  isCrossNode: true,
+                });
+              }
             }
           }
         }
@@ -108,6 +105,10 @@ export class ArchitectureGraphService {
               status: 'online',
               icon: '🐘',
               latencyMs: 7,
+              nodeId: selfNode.id,
+              nodeName: 'Local DB',
+              isRemote: false,
+              connectionType: 'local',
             });
           }
           edges.push({
@@ -117,6 +118,7 @@ export class ArchitectureGraphService {
             label: 'SQL / Prisma',
             protocol: 'TCP',
             status: isRunning ? 'active' : 'inactive',
+            isCrossNode: false,
           });
         }
 
@@ -133,6 +135,10 @@ export class ArchitectureGraphService {
               status: 'online',
               icon: '⚡',
               latencyMs: 3,
+              nodeId: selfNode.id,
+              nodeName: 'Local Cache',
+              isRemote: false,
+              connectionType: 'local',
             });
           }
           edges.push({
@@ -142,9 +148,43 @@ export class ArchitectureGraphService {
             label: 'Pub/Sub Cache',
             protocol: 'TCP',
             status: isRunning ? 'active' : 'inactive',
+            isCrossNode: false,
           });
         }
       }
+    }
+
+    // 2. Add Remote Peer Projects from Team Catalog (excluding self)
+    const remoteProjects = teamCatalog.filter((p) => p.isRemote && p.nodeId !== selfNode.id);
+    for (const rp of remoteProjects) {
+      const isRunning = rp.status === 'running';
+      const port = rp.port || 3000;
+      let category: GraphNode['category'] = 'backend';
+      let icon = '⚡';
+
+      const lowerName = (rp.name + (rp.runCommand || '')).toLowerCase();
+      if (lowerName.includes('vite') || lowerName.includes('react') || lowerName.includes('next') || lowerName.includes('vue') || lowerName.includes('web') || lowerName.includes('client')) {
+        category = 'frontend';
+        icon = '⚛️';
+      } else if (lowerName.includes('db') || lowerName.includes('postgres') || lowerName.includes('mysql')) {
+        category = 'database';
+        icon = '🐘';
+      }
+
+      nodes.push({
+        id: `remote-${rp.id}`,
+        label: rp.name,
+        subLabel: `${rp.nodeName || 'Peer'} • :${port}`,
+        category,
+        port,
+        status: isRunning ? 'online' : 'offline',
+        icon,
+        latencyMs: rp.connectionType === 'lan' ? 1 : 15,
+        nodeId: rp.nodeId,
+        nodeName: rp.nodeName,
+        isRemote: true,
+        connectionType: rp.connectionType,
+      });
     }
 
     // Add unique database/cache nodes
@@ -155,6 +195,7 @@ export class ArchitectureGraphService {
     const onlineNodes = nodes.filter((n) => n.status === 'online').length;
     const healthyPercent = nodes.length > 0 ? Math.round((onlineNodes / nodes.length) * 100) : 100;
     const activeConns = edges.filter((e) => e.status === 'active').length;
+    const crossNodeCount = edges.filter((e) => e.isCrossNode && e.status === 'active').length;
 
     return {
       nodes,
@@ -163,6 +204,7 @@ export class ArchitectureGraphService {
         totalNodes: nodes.length,
         activeConnections: activeConns,
         healthyPercent,
+        crossNodeConnections: crossNodeCount,
       },
     };
   }

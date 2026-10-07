@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, RefreshCw, X, AlertTriangle, CheckCircle, Trash2, Cpu, Zap, Activity } from 'lucide-react';
-import type { PortStatus } from '../types';
+import { 
+  Shield, 
+  RefreshCw, 
+  X, 
+  AlertTriangle, 
+  CheckCircle, 
+  Trash2, 
+  Cpu, 
+  Zap, 
+  Activity, 
+  Wifi, 
+  Globe, 
+  Laptop, 
+  Radio,
+  ExternalLink
+} from 'lucide-react';
+import type { PortStatus, TeamPortClash } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
 interface PortRadarModalProps {
@@ -10,6 +25,7 @@ interface PortRadarModalProps {
 
 export const PortRadarModal: React.FC<PortRadarModalProps> = ({ isOpen, onClose }) => {
   const [ports, setPorts] = useState<PortStatus[]>([]);
+  const [teamClashes, setTeamClashes] = useState<TeamPortClash[]>([]);
   const [loading, setLoading] = useState(false);
   const [killingPort, setKillingPort] = useState<number | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -19,10 +35,17 @@ export const PortRadarModal: React.FC<PortRadarModalProps> = ({ isOpen, onClose 
     setLoading(true);
     setActionMessage(null);
     try {
-      const res = await fetch('/api/ports/radar');
-      if (res.ok) {
-        const data = await res.json();
+      const [radarRes, clashesRes] = await Promise.all([
+        fetch('/api/ports/radar'),
+        fetch('/api/ports/team-clashes')
+      ]);
+      if (radarRes.ok) {
+        const data = await radarRes.json();
         setPorts(data);
+      }
+      if (clashesRes.ok) {
+        const clashData = await clashesRes.json();
+        setTeamClashes(clashData);
       }
     } catch (e) {
       console.error('Scan ports failed', e);
@@ -156,6 +179,63 @@ export const PortRadarModal: React.FC<PortRadarModalProps> = ({ isOpen, onClose 
               </div>
             </div>
           </div>
+
+          {/* Team Mesh Cross-Node Port Clashes Banner */}
+          {teamClashes.length > 0 && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                  <h4 className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                    Cảnh Báo Trùng Cổng Đa Trạm (Team Mesh Port Clashes: {teamClashes.length} xung đột)
+                  </h4>
+                </div>
+                <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                  Đang chạy cùng cổng trên các máy khác nhau
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                {teamClashes.map((clash) => (
+                  <div key={clash.port} className="rounded-lg border border-hub bg-hub-card p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-hub-primary text-xs bg-black/[0.04] dark:bg-white/[0.06] px-2 py-0.5 rounded">
+                        Port :{clash.port}
+                      </span>
+                      <span className="text-[10px] text-hub-muted font-medium">
+                        {clash.projects.length} dịch vụ
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      {clash.projects.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between text-[11px] py-0.5">
+                          <span className="font-semibold text-hub-primary truncate max-w-[150px]">{p.name}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {p.isRemote ? (
+                              <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-medium">
+                                <Wifi className="h-2.5 w-2.5" />
+                                <span>{p.nodeName || 'Remote'}</span>
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">
+                                <Laptop className="h-2.5 w-2.5" />
+                                <span>Máy của tôi</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="border-t border-hub pt-1.5 text-[10px] text-hub-muted leading-tight">
+                      💡 Lưu ý: Khi gọi chéo dịch vụ, gọi trực tiếp theo IP của máy trạm đích thay vì <code className="font-mono">localhost</code>.
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Filter Bar */}
           <div className="flex items-center justify-between gap-3">

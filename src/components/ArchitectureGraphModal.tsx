@@ -12,7 +12,11 @@ import {
   ArrowRight, 
   CheckCircle2, 
   AlertTriangle,
-  Info
+  Info,
+  Wifi,
+  Laptop,
+  ExternalLink,
+  ShieldCheck
 } from 'lucide-react';
 import type { ArchitectureTopology, GraphNode, GraphEdge } from '../types';
 
@@ -25,6 +29,7 @@ export const ArchitectureGraphModal: React.FC<ArchitectureGraphModalProps> = ({ 
   const [topology, setTopology] = useState<ArchitectureTopology | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [viewFilter, setViewFilter] = useState<'all' | 'local'>('all');
 
   const fetchTopology = async () => {
     setLoading(true);
@@ -52,9 +57,12 @@ export const ArchitectureGraphModal: React.FC<ArchitectureGraphModalProps> = ({ 
 
   if (!isOpen) return null;
 
-  const nodes = topology?.nodes || [];
-  const edges = topology?.edges || [];
-  const stats = topology?.stats || { totalNodes: 0, activeConnections: 0, healthyPercent: 100 };
+  const rawNodes = topology?.nodes || [];
+  const rawEdges = topology?.edges || [];
+  const stats = topology?.stats || { totalNodes: 0, activeConnections: 0, healthyPercent: 100, crossNodeConnections: 0 };
+
+  const nodes = viewFilter === 'local' ? rawNodes.filter((n) => !n.isRemote) : rawNodes;
+  const edges = viewFilter === 'local' ? rawEdges.filter((e) => !e.isCrossNode) : rawEdges;
 
   const frontends = nodes.filter((n) => n.category === 'frontend');
   const backends = nodes.filter((n) => n.category === 'backend' || n.category === 'service');
@@ -71,18 +79,44 @@ export const ArchitectureGraphModal: React.FC<ArchitectureGraphModalProps> = ({ 
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-hub-primary">Microservices Architecture Graph</h2>
-                <span className="rounded bg-indigo-500/10 px-2 py-0.5 text-[11px] font-medium text-indigo-500">
-                  Live Topology
+                <h2 className="text-base font-semibold text-hub-primary">
+                  Distributed Microservices Topology
+                </h2>
+                <span className="rounded bg-indigo-500/10 px-2 py-0.5 text-[11px] font-semibold text-indigo-500">
+                  Team Mesh Live Graph
                 </span>
               </div>
               <p className="text-xs text-hub-muted">
-                Sơ đồ liên kết động giữa Frontend, Backend APIs và Hệ quản trị CSDL / Cache
+                Sơ đồ liên kết động giữa Web UI, Backend APIs và CSDL phân tán trên toàn bộ mạng lưới máy trạm trong công ty
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* View Scope Filter */}
+            <div className="flex items-center gap-1 rounded-lg border border-hub bg-hub-card p-0.5 text-xs mr-2">
+              <button
+                onClick={() => setViewFilter('all')}
+                className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all ${
+                  viewFilter === 'all'
+                    ? 'bg-[var(--hub-accent)] text-white shadow-2xs font-semibold'
+                    : 'text-hub-secondary hover:text-hub-primary'
+                }`}
+              >
+                Toàn bộ Mesh ({rawNodes.length})
+              </button>
+              <button
+                onClick={() => setViewFilter('local')}
+                className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all ${
+                  viewFilter === 'local'
+                    ? 'bg-[var(--hub-accent)] text-white shadow-2xs font-semibold'
+                    : 'text-hub-secondary hover:text-hub-primary'
+                }`}
+              >
+                Chỉ máy này ({rawNodes.filter(n => !n.isRemote).length})
+              </button>
+            </div>
+
             <button
               onClick={fetchTopology}
               disabled={loading}
@@ -102,7 +136,7 @@ export const ArchitectureGraphModal: React.FC<ArchitectureGraphModalProps> = ({ 
         </div>
 
         {/* Top Metric Strip */}
-        <div className="grid grid-cols-3 border-b border-hub bg-black/[0.01] dark:bg-white/[0.01] divide-x divide-hub px-6 py-2.5 text-xs">
+        <div className="grid grid-cols-4 border-b border-hub bg-black/[0.01] dark:bg-white/[0.01] divide-x divide-hub px-6 py-2.5 text-xs">
           <div className="flex items-center gap-2 px-2">
             <Layers className="h-4 w-4 text-blue-500" />
             <span className="text-hub-muted">Tổng dịch vụ:</span>
@@ -110,8 +144,13 @@ export const ArchitectureGraphModal: React.FC<ArchitectureGraphModalProps> = ({ 
           </div>
           <div className="flex items-center gap-2 px-4">
             <Zap className="h-4 w-4 text-amber-500" />
-            <span className="text-hub-muted">Kết nối đang hoạt động:</span>
+            <span className="text-hub-muted">Kết nối hoạt động:</span>
             <strong className="text-hub-primary font-semibold">{stats.activeConnections} / {edges.length} Active</strong>
+          </div>
+          <div className="flex items-center gap-2 px-4">
+            <Wifi className="h-4 w-4 text-purple-500" />
+            <span className="text-hub-muted">Liên kết Mesh chéo trạm:</span>
+            <strong className="text-purple-600 dark:text-purple-400 font-semibold">{stats.crossNodeConnections || 0} Links</strong>
           </div>
           <div className="flex items-center gap-2 px-4">
             <Activity className="h-4 w-4 text-emerald-500" />
@@ -220,31 +259,35 @@ export const ArchitectureGraphModal: React.FC<ArchitectureGraphModalProps> = ({ 
                     return (
                       <div
                         key={edge.id}
-                        className="flex items-center justify-between rounded-lg border border-hub bg-hub-card px-3 py-2 transition-all"
+                        className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${
+                          isActive
+                            ? 'border-emerald-500/20 bg-emerald-500/5 text-hub-primary'
+                            : 'border-hub bg-hub-card text-hub-muted'
+                        }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-semibold text-hub-primary truncate max-w-[100px]" title={src?.label}>
+                          <span className="font-semibold text-hub-primary truncate max-w-[110px]">
                             {src?.label || edge.source}
                           </span>
-                          <ArrowRight className="h-3 w-3 text-hub-muted shrink-0" />
-                          <span className="font-semibold text-hub-primary truncate max-w-[100px]" title={tgt?.label}>
+                          <ArrowRight className="h-3.5 w-3.5 shrink-0 text-hub-muted" />
+                          <span className="font-semibold text-hub-primary truncate max-w-[110px]">
                             {tgt?.label || edge.target}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <span className="rounded bg-black/[0.05] dark:bg-white/[0.05] px-1.5 py-0.5 text-[10px] font-mono text-hub-muted">
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-semibold ${
+                            edge.isCrossNode
+                              ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
+                              : 'bg-black/[0.04] dark:bg-white/[0.06] text-hub-muted'
+                          }`}>
                             {edge.label}
                           </span>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${
-                              isActive
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                                : 'bg-neutral-500/10 text-neutral-400'
+                            className={`h-2 w-2 rounded-full ${
+                              isActive ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-400'
                             }`}
-                          >
-                            {isActive ? 'ONLINE' : 'OFFLINE'}
-                          </span>
+                          />
                         </div>
                       </div>
                     );
@@ -254,80 +297,111 @@ export const ArchitectureGraphModal: React.FC<ArchitectureGraphModalProps> = ({ 
             )}
           </div>
 
-          {/* Node Inspector Drawer */}
+          {/* Node Inspector Side Panel */}
           {selectedNode && (
-            <div className="w-72 border-l border-hub bg-hub-sidebar/40 p-4 space-y-4 text-xs overflow-y-auto">
-              <div className="flex items-center justify-between pb-2 border-b border-hub">
-                <span className="font-bold text-hub-muted uppercase tracking-wider text-[11px]">
-                  Chi Tiết Thành Phần
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                    selectedNode.status === 'online'
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-neutral-500/10 text-neutral-400'
-                  }`}
-                >
-                  {selectedNode.status.toUpperCase()}
-                </span>
-              </div>
-
-              <div>
-                <div className="text-base font-bold text-hub-primary flex items-center gap-2">
-                  <span>{selectedNode.icon}</span>
-                  <span>{selectedNode.label}</span>
-                </div>
-                <div className="text-xs text-hub-muted mt-0.5">{selectedNode.subLabel}</div>
-              </div>
-
-              <div className="space-y-2 border-t border-hub pt-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-hub-muted">Phân loại:</span>
-                  <span className="font-semibold text-hub-primary capitalize">{selectedNode.category}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-hub-muted">Cổng mạng (Port):</span>
-                  <span className="font-mono text-hub-primary font-semibold">:{selectedNode.port || '—'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-hub-muted">Độ trễ phản hồi:</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-                    {selectedNode.latencyMs !== undefined ? `${selectedNode.latencyMs} ms` : '—'}
+            <div className="w-80 border-l border-hub bg-hub-sidebar p-5 flex flex-col justify-between overflow-y-auto">
+              <div className="space-y-4 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-hub-muted block mb-1">
+                    Chi tiết Dịch Vụ
                   </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{selectedNode.icon}</span>
+                    <div>
+                      <h3 className="font-bold text-sm text-hub-primary leading-tight">
+                        {selectedNode.label}
+                      </h3>
+                      <span className="text-[11px] text-hub-muted">{selectedNode.subLabel}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {/* Related Connections */}
-              <div className="border-t border-hub pt-3 space-y-2">
-                <span className="text-hub-muted font-semibold block text-[11px] uppercase">
-                  Đường truyền liên quan:
-                </span>
-                {edges
-                  .filter((e) => e.source === selectedNode.id || e.target === selectedNode.id)
-                  .map((e) => {
-                    const isSource = e.source === selectedNode.id;
-                    const otherNodeId = isSource ? e.target : e.source;
-                    const otherNode = nodes.find((n) => n.id === otherNodeId);
-                    return (
-                      <div
-                        key={e.id}
-                        className="rounded border border-hub bg-hub-card p-2 text-[11px] space-y-1"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-hub-muted">{isSource ? 'Gửi tới' : 'Nhận từ'}:</span>
-                          <span className="font-semibold text-hub-primary truncate max-w-[120px]">
-                            {otherNode?.label || otherNodeId}
-                          </span>
+                <div className="space-y-2 border-t border-hub pt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-hub-muted">Trạm Làm Việc (Node):</span>
+                    <span className="font-semibold text-hub-primary flex items-center gap-1">
+                      {selectedNode.isRemote ? (
+                        selectedNode.connectionType === 'lan' ? (
+                          <Wifi className="h-3 w-3 text-emerald-500" />
+                        ) : (
+                          <Globe className="h-3 w-3 text-blue-500" />
+                        )
+                      ) : (
+                        <Laptop className="h-3 w-3 text-sky-500" />
+                      )}
+                      <span>{selectedNode.nodeName || 'Local'}</span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-hub-muted">Phân loại Tier:</span>
+                    <span className="font-semibold uppercase text-hub-primary">
+                      {selectedNode.category}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-hub-muted">Cổng mạng (Port):</span>
+                    <span className="font-mono font-semibold text-hub-primary">
+                      :{selectedNode.port}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-hub-muted">Độ trễ phản hồi:</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {selectedNode.latencyMs !== undefined ? `${selectedNode.latencyMs} ms` : '—'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-hub-muted">Trạng thái:</span>
+                    <span
+                      className={`font-semibold capitalize ${
+                        selectedNode.status === 'online'
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-neutral-400'
+                      }`}
+                    >
+                      {selectedNode.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Related Connections */}
+                <div className="border-t border-hub pt-3 space-y-2">
+                  <span className="text-hub-muted font-semibold block text-[11px] uppercase">
+                    Đường truyền liên quan:
+                  </span>
+                  {edges
+                    .filter((e) => e.source === selectedNode.id || e.target === selectedNode.id)
+                    .map((e) => {
+                      const isSource = e.source === selectedNode.id;
+                      const otherNodeId = isSource ? e.target : e.source;
+                      const otherNode = nodes.find((n) => n.id === otherNodeId);
+                      return (
+                        <div
+                          key={e.id}
+                          className="rounded-lg border border-hub bg-hub-card p-2 text-[11px] space-y-1"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-hub-muted">{isSource ? 'Gửi tới' : 'Nhận từ'}:</span>
+                            <span className="font-semibold text-hub-primary truncate max-w-[120px]">
+                              {otherNode?.label || otherNodeId}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-hub-muted">
+                            <span className={e.isCrossNode ? 'text-purple-600 dark:text-purple-400 font-semibold' : ''}>
+                              {e.label}
+                            </span>
+                            <span className={e.status === 'active' ? 'text-emerald-500 font-semibold' : 'text-neutral-400'}>
+                              {e.status}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-hub-muted">
-                          <span>{e.label} ({e.protocol})</span>
-                          <span className={e.status === 'active' ? 'text-emerald-500 font-semibold' : 'text-neutral-400'}>
-                            {e.status}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                </div>
               </div>
             </div>
           )}
@@ -370,8 +444,30 @@ const NodeCard: React.FC<{
         </span>
       </div>
 
-      <div className="flex items-center justify-between text-[11px] text-hub-muted border-t border-hub pt-2 mt-2">
-        <span className="font-mono bg-black/[0.04] dark:bg-white/[0.04] px-1.5 py-0.5 rounded">
+      {/* Workstation Badge */}
+      <div className="flex items-center justify-between mb-2 pb-2 border-b border-hub/60 text-[10px]">
+        {node.isRemote ? (
+          node.connectionType === 'lan' ? (
+            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium truncate max-w-[140px]">
+              <Wifi className="h-3 w-3 shrink-0" />
+              <span className="truncate">{node.nodeName}</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium truncate max-w-[140px]">
+              <Globe className="h-3 w-3 shrink-0" />
+              <span className="truncate">{node.nodeName}</span>
+            </span>
+          )
+        ) : (
+          <span className="flex items-center gap-1 text-hub-muted font-medium">
+            <Laptop className="h-3 w-3" />
+            <span>Máy này (Local)</span>
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between text-[11px] text-hub-muted">
+        <span className="font-mono bg-black/[0.04] dark:bg-white/[0.04] px-1.5 py-0.5 rounded font-semibold">
           :{node.port}
         </span>
         {node.latencyMs !== undefined && (
