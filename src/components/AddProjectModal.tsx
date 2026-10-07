@@ -168,7 +168,7 @@ export const AddProjectModal: React.FC = () => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl border border-hub bg-hub-card shadow-2xl overflow-hidden transition-colors">
+      <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl border border-hub bg-hub-card shadow-2xl overflow-hidden transition-colors min-[1440px]:w-[80vw] min-[1440px]:max-w-[80vw] min-[1440px]:h-[90vh] min-[1440px]:max-h-[90vh] modal-extension-large">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-hub bg-hub-sidebar/70 backdrop-blur-md shrink-0">
           <div>

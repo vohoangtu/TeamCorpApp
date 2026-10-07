@@ -423,4 +423,15 @@
   opacity: 0.85 !important;
 }
 
+/* Extension & Utilities Modals Responsive Rule: Desktop > 1440px -> 80% width and 90vh height */
+@media (min-width: 1440px) {
+  .modal-extension-large {
+    width: 80vw !important;
+    max-width: 80vw !important;
+    height: 90vh !important;
+    max-height: 90vh !important;
+  }
+}
+
+
 

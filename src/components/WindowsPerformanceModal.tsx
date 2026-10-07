@@ -86,7 +86,7 @@ export const WindowsPerformanceModal: React.FC<WindowsPerformanceModalProps> = (
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
       <div 
-        className="relative flex flex-col w-full max-w-6xl h-[88vh] rounded-xl border border-hub bg-hub-card shadow-2xl overflow-hidden text-hub-primary"
+        className="relative flex flex-col w-full max-w-6xl h-[88vh] rounded-xl border border-hub bg-hub-card shadow-2xl overflow-hidden text-hub-primary min-[1440px]:w-[80vw] min-[1440px]:max-w-[80vw] min-[1440px]:h-[90vh] min-[1440px]:max-h-[90vh] modal-extension-large"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Top Header */}

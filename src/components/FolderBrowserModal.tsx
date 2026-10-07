@@ -125,7 +125,7 @@ export const FolderBrowserModal: React.FC<FolderBrowserModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="fluent-card relative flex flex-col max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-xl shadow-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1C1C1C]">
+      <div className="fluent-card relative flex flex-col max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-xl shadow-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1C1C1C] min-[1440px]:w-[80vw] min-[1440px]:max-w-[80vw] min-[1440px]:h-[90vh] min-[1440px]:max-h-[90vh] modal-extension-large">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-black/[0.08] dark:border-white/[0.08] px-5 py-3.5 bg-black/[0.02] dark:bg-white/[0.02]">
           <div className="flex items-center gap-2.5">
