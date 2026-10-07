@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { exec } from 'node:child_process';
-import type { MeshNode, Project } from '../src/types';
+import type { MeshNode, Project, MeshConfig, MeshAuditLog } from '../src/types';
 import { projectStore } from './store';
 
 const UDP_PORT = 4105;
@@ -25,8 +25,13 @@ export class MeshDiscoveryService {
   private peerApps: Map<string, Project[]> = new Map();
   private broadcastFn: ((type: string, payload: any) => void) | null = null;
 
+  private config: MeshConfig;
+  private auditLogs: MeshAuditLog[] = [];
+  private actionExecutor: ((projectId: string, action: 'restart' | 'sync' | 'stop' | 'start') => Promise<any>) | null = null;
+
   constructor() {
     this.hostId = this.getOrCreateHostId();
+    this.config = this.loadConfig();
   }
 
   setBroadcast(fn: (type: string, payload: any) => void) {
@@ -56,6 +61,244 @@ export class MeshDiscoveryService {
     } catch {
       return `node_${os.hostname().toLowerCase()}_${Date.now().toString(36)}`;
     }
+  }
+
+  // --- Configuration Management ---
+  private loadConfig(): MeshConfig {
+    const dataDir = path.join(os.homedir(), '.windev-hub');
+    const configFile = path.join(dataDir, 'mesh-config.json');
+    try {
+      if (fs.existsSync(configFile)) {
+        const raw = fs.readFileSync(configFile, 'utf-8');
+        return {
+          teamToken: 'windev-mesh-token-2026',
+          allowRemoteControl: true,
+          requireToken: true,
+          ...JSON.parse(raw),
+          hostId: this.hostId,
+        };
+      }
+    } catch {}
+    return {
+      teamToken: 'windev-mesh-token-2026',
+      allowRemoteControl: true,
+      requireToken: true,
+      hostId: this.hostId,
+    };
+  }
+
+  public saveConfig(newConfig: Partial<MeshConfig>): MeshConfig {
+    this.config = {
+      ...this.config,
+      ...newConfig,
+      hostId: this.hostId,
+    };
+    try {
+      const dataDir = path.join(os.homedir(), '.windev-hub');
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      const configFile = path.join(dataDir, 'mesh-config.json');
+      fs.writeFileSync(configFile, JSON.stringify(this.config, null, 2), 'utf-8');
+    } catch {}
+    this.notify('mesh:config_updated', this.config);
+    return this.config;
+  }
+
+  public getConfig(): MeshConfig {
+    return this.config;
+  }
+
+  // --- Audit Trail Logging ---
+  public getAuditLogs(): MeshAuditLog[] {
+    return [...this.auditLogs];
+  }
+
+  public addAuditLog(item: Omit<MeshAuditLog, 'id' | 'timestamp'>): MeshAuditLog {
+    const log: MeshAuditLog = {
+      ...item,
+      id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: Date.now(),
+    };
+    this.auditLogs.unshift(log);
+    if (this.auditLogs.length > 200) {
+      this.auditLogs = this.auditLogs.slice(0, 200);
+    }
+    this.notify('mesh:audit_logs_updated', this.auditLogs);
+    return log;
+  }
+
+  public clearAuditLogs(): void {
+    this.auditLogs = [];
+    this.notify('mesh:audit_logs_updated', this.auditLogs);
+  }
+
+  // --- Remote Execution Engine ---
+  public setActionExecutor(fn: (projectId: string, action: 'restart' | 'sync' | 'stop' | 'start') => Promise<any>) {
+    this.actionExecutor = fn;
+  }
+
+  public async executeLocalActionFromPeer(params: {
+    actorIp: string;
+    actorNodeId?: string;
+    actorHostname?: string;
+    actorUsername?: string;
+    token?: string;
+    projectId: string;
+    action: 'restart' | 'sync' | 'stop' | 'start';
+  }): Promise<{ success: boolean; message?: string; error?: string }> {
+    const actorName = `${params.actorUsername || 'dev'}@${params.actorHostname || params.actorIp}`;
+    const project = projectStore.get(params.projectId);
+    const projectName = project ? project.name : params.projectId;
+
+    // 1. Verify Team Token if required
+    if (this.config.requireToken && params.token !== this.config.teamToken) {
+      this.addAuditLog({
+        action: params.action,
+        actorIp: params.actorIp,
+        actorHostname: params.actorHostname || 'unknown',
+        actorUsername: params.actorUsername || 'unknown',
+        targetProjectId: params.projectId,
+        targetProjectName: projectName,
+        status: 'rejected',
+        reason: 'Team Token xác thực không hợp lệ',
+      });
+      return { success: false, error: 'Xác thực thất bại: Team Token không khớp' };
+    }
+
+    // 2. Check Remote Control Policy
+    if (!this.config.allowRemoteControl) {
+      this.addAuditLog({
+        action: params.action,
+        actorIp: params.actorIp,
+        actorHostname: params.actorHostname || 'unknown',
+        actorUsername: params.actorUsername || 'unknown',
+        targetProjectId: params.projectId,
+        targetProjectName: projectName,
+        status: 'rejected',
+        reason: 'Chủ máy đã tắt tính năng cho phép điều khiển từ xa',
+      });
+      return { success: false, error: 'Chủ máy đã tắt tính năng cho phép điều khiển từ xa' };
+    }
+
+    // 3. Check Project Existence
+    if (!project) {
+      this.addAuditLog({
+        action: params.action,
+        actorIp: params.actorIp,
+        actorHostname: params.actorHostname || 'unknown',
+        actorUsername: params.actorUsername || 'unknown',
+        targetProjectId: params.projectId,
+        targetProjectName: projectName,
+        status: 'failed',
+        reason: 'Không tìm thấy ứng dụng',
+      });
+      return { success: false, error: 'Không tìm thấy ứng dụng trên máy này' };
+    }
+
+    // 4. Check Action Executor Ready
+    if (!this.actionExecutor) {
+      return { success: false, error: 'Hệ thống chưa sẵn sàng xử lý tác vụ' };
+    }
+
+    try {
+      await this.actionExecutor(params.projectId, params.action);
+
+      this.addAuditLog({
+        action: params.action,
+        actorIp: params.actorIp,
+        actorHostname: params.actorHostname || 'unknown',
+        actorUsername: params.actorUsername || 'unknown',
+        targetProjectId: params.projectId,
+        targetProjectName: projectName,
+        status: 'success',
+      });
+
+      // Send live notification to local user UI
+      this.notify('mesh:remote_notification', {
+        id: `notif_${Date.now()}`,
+        timestamp: Date.now(),
+        type: 'action_executed',
+        title: 'Điều Khiển Từ Xa (Team Mesh)',
+        message: `${actorName} vừa thực hiện lệnh [${params.action.toUpperCase()}] trên ứng dụng "${project.name}"`,
+        actor: actorName,
+        action: params.action,
+        projectName: project.name,
+      });
+
+      return { success: true, message: `Thao tác [${params.action}] trên "${project.name}" thành công` };
+    } catch (err: any) {
+      this.addAuditLog({
+        action: params.action,
+        actorIp: params.actorIp,
+        actorHostname: params.actorHostname || 'unknown',
+        actorUsername: params.actorUsername || 'unknown',
+        targetProjectId: params.projectId,
+        targetProjectName: projectName,
+        status: 'failed',
+        reason: err.message,
+      });
+      return { success: false, error: err.message || 'Lỗi không xác định khi thực thi lệnh' };
+    }
+  }
+
+  public async dispatchActionToPeer(
+    targetNodeId: string,
+    projectId: string,
+    action: 'restart' | 'sync' | 'stop' | 'start'
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    const peer = this.peers.get(targetNodeId);
+    if (!peer) {
+      return { success: false, error: 'Không tìm thấy node đích hoặc node đã ngắt kết nối' };
+    }
+
+    return new Promise((resolve) => {
+      const payload = JSON.stringify({ projectId, action });
+      const options = {
+        hostname: peer.ip,
+        port: peer.port,
+        path: '/api/mesh/execute-local-action',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          'X-Mesh-Token': this.config.teamToken,
+          'X-Mesh-Actor-NodeId': this.hostId,
+          'X-Mesh-Actor-Hostname': os.hostname(),
+          'X-Mesh-Actor-Username': os.userInfo().username || 'developer',
+        },
+        timeout: 8000,
+      };
+
+      const req = http.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            resolve(data);
+          } catch {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              resolve({ success: true, message: 'Đã gửi lệnh thành công' });
+            } else {
+              resolve({ success: false, error: `Lỗi HTTP ${res.statusCode}: ${body || 'Không có phản hồi'}` });
+            }
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        resolve({ success: false, error: `Không thể kết nối tới node ${peer.name}: ${err.message}` });
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ success: false, error: `Hết thời gian chờ phản hồi từ node ${peer.name} (timeout 8s)` });
+      });
+
+      req.write(payload);
+      req.end();
+    });
   }
 
   // Detects best local LAN IPv4 address (e.g. 192.168.x.x, 10.x.x.x)

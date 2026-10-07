@@ -31,6 +31,8 @@ import { UnifiedLogsView } from './components/UnifiedLogsView';
 import { WindowsPerformanceView } from './components/WindowsPerformanceView';
 import { SettingsView } from './components/SettingsView';
 import { MeshNodeSelector } from './components/MeshNodeSelector';
+import { MeshAuditModal } from './components/MeshAuditModal';
+import { MeshSettingsModal } from './components/MeshSettingsModal';
 import { useAppStore } from './store/useAppStore';
 import { Plus, FolderGit2, Zap, Search, List, LayoutGrid } from 'lucide-react';
 
@@ -636,6 +638,12 @@ export const App: React.FC = () => {
         isOpen={isWindowsTuningOpen}
         onClose={() => setIsWindowsTuningOpen(false)}
       />
+
+      {/* Mesh Audit Trail Modal */}
+      <MeshAuditModal />
+
+      {/* Mesh Security & Remote Policy Settings Modal */}
+      <MeshSettingsModal />
 
       {/* Windows 11 Mini Tray Floating Widget */}
       <TrayMiniWidget />

@@ -15,7 +15,10 @@ import type {
   ProcessPriority,
   ProjectProcessPriority,
   DevDriveAuditReport,
-  MeshNode
+  MeshNode,
+  MeshConfig,
+  MeshAuditLog,
+  MeshRemoteNotification
 } from '../types';
 import { type ThemeId, THEMES, THEME_LIST, applyThemeToDocument, getStoredThemeId } from '../themes';
 import { type MaterialType, MATERIALS, MATERIAL_LIST, applyMaterialToDocument, getStoredMaterialType } from '../materials';
@@ -26,10 +29,25 @@ interface AppState {
   meshNodes: MeshNode[];
   activeNodeFilter: string;
   teamCatalog: Project[];
+  meshConfig: MeshConfig | null;
+  meshAuditLogs: MeshAuditLog[];
+  isAuditModalOpen: boolean;
+  isMeshSettingsOpen: boolean;
   setActiveNodeFilter: (nodeFilter: string) => void;
+  setIsAuditModalOpen: (open: boolean) => void;
+  setIsMeshSettingsOpen: (open: boolean) => void;
   fetchMeshNodes: () => Promise<void>;
   fetchTeamCatalog: () => Promise<void>;
   toggleProjectShare: (projectId: string) => Promise<boolean>;
+  fetchMeshConfig: () => Promise<void>;
+  updateMeshConfig: (config: Partial<MeshConfig>) => Promise<MeshConfig | null>;
+  fetchMeshAuditLogs: () => Promise<void>;
+  clearMeshAuditLogs: () => Promise<void>;
+  triggerRemoteProjectAction: (
+    nodeId: string,
+    projectId: string,
+    action: 'restart' | 'sync' | 'stop' | 'start'
+  ) => Promise<{ success: boolean; message?: string; error?: string }>;
 
   projects: Project[];
   activeProjectId: string | null;
@@ -163,7 +181,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   meshNodes: [],
   activeNodeFilter: 'all',
   teamCatalog: [],
+  meshConfig: null,
+  meshAuditLogs: [],
+  isAuditModalOpen: false,
+  isMeshSettingsOpen: false,
   setActiveNodeFilter: (filter) => set({ activeNodeFilter: filter }),
+  setIsAuditModalOpen: (open) => set({ isAuditModalOpen: open }),
+  setIsMeshSettingsOpen: (open) => set({ isMeshSettingsOpen: open }),
 
   projects: [],
   activeProjectId: null,
@@ -633,6 +657,88 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  fetchMeshConfig: async () => {
+    try {
+      const res = await fetch('/api/mesh/config');
+      if (res.ok) {
+        const data = await res.json();
+        set({ meshConfig: data });
+      }
+    } catch (e) {
+      console.error('Failed to fetch mesh config', e);
+    }
+  },
+
+  updateMeshConfig: async (config) => {
+    try {
+      const res = await fetch('/api/mesh/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        set({ meshConfig: data });
+        NotificationService.notify('Đã cập nhật cấu hình Mesh', {
+          body: 'Thiết lập bảo mật và token đã được lưu thành công.',
+        });
+        return data;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  fetchMeshAuditLogs: async () => {
+    try {
+      const res = await fetch('/api/mesh/audit-logs');
+      if (res.ok) {
+        const data = await res.json();
+        set({ meshAuditLogs: data });
+      }
+    } catch (e) {
+      console.error('Failed to fetch mesh audit logs', e);
+    }
+  },
+
+  clearMeshAuditLogs: async () => {
+    try {
+      await fetch('/api/mesh/audit-logs', { method: 'DELETE' });
+      set({ meshAuditLogs: [] });
+    } catch (e) {
+      console.error('Failed to clear audit logs', e);
+    }
+  },
+
+  triggerRemoteProjectAction: async (nodeId, projectId, action) => {
+    try {
+      const res = await fetch(`/api/mesh/nodes/${nodeId}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, action }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        NotificationService.notify('Lệnh từ xa thành công', {
+          body: data.message || `Đã gửi lệnh [${action.toUpperCase()}] tới máy trạm.`,
+        });
+        get().fetchTeamCatalog();
+        return { success: true, message: data.message };
+      } else {
+        NotificationService.notify('Lệnh từ xa thất bại', {
+          body: data.error || 'Không thể thực thi lệnh trên máy đích.',
+        });
+        return { success: false, error: data.error };
+      }
+    } catch (e: any) {
+      NotificationService.notify('Lỗi kết nối Mesh', {
+        body: e.message || 'Không thể gửi lệnh qua mạng.',
+      });
+      return { success: false, error: e.message };
+    }
+  },
+
   connectWebSocket: () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -648,6 +754,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().fetchDeployments();
         get().fetchMeshNodes();
         get().fetchTeamCatalog();
+        get().fetchMeshConfig();
+        get().fetchMeshAuditLogs();
       };
 
       socket.onmessage = (event) => {
@@ -706,6 +814,14 @@ export const useAppStore = create<AppState>((set, get) => ({
             set({ meshNodes: msg.payload });
           } else if (msg.type === 'mesh:catalog_updated' || msg.type === 'mesh:catalog_all') {
             set({ teamCatalog: msg.payload });
+          } else if (msg.type === 'mesh:config_updated') {
+            set({ meshConfig: msg.payload });
+          } else if (msg.type === 'mesh:audit_logs_updated') {
+            set({ meshAuditLogs: msg.payload });
+          } else if (msg.type === 'mesh:remote_notification') {
+            NotificationService.notify(msg.payload.title, {
+              body: msg.payload.message,
+            });
           }
         } catch (e) {
           console.error('WS parse error', e);

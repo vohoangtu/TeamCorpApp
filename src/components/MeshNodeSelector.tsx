@@ -10,7 +10,9 @@ import {
   Info, 
   ShieldCheck, 
   Check, 
-  ChevronDown 
+  ChevronDown,
+  KeyRound,
+  History 
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import type { MeshNode } from '../types';
@@ -23,7 +25,10 @@ export const MeshNodeSelector: React.FC = () => {
     fetchMeshNodes, 
     fetchTeamCatalog,
     projects,
-    teamCatalog
+    teamCatalog,
+    setIsMeshSettingsOpen,
+    setIsAuditModalOpen,
+    meshAuditLogs
   } = useAppStore();
 
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -117,8 +122,31 @@ export const MeshNodeSelector: React.FC = () => {
         })}
       </div>
 
-      {/* Right: Mesh Network Status Badge & Network Info Popover */}
+      {/* Right: Mesh Network Status Badge, Token, Audit & Network Info Popover */}
       <div className="relative flex items-center gap-2 shrink-0">
+        <button
+          onClick={() => setIsMeshSettingsOpen(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold border border-hub bg-hub-card text-hub-secondary hover:text-hub-primary transition-colors shadow-2xs"
+          title="Cấu hình Team Secret Token & Quyền điều khiển từ xa"
+        >
+          <KeyRound className="h-3.5 w-3.5 text-amber-500" />
+          <span className="hidden sm:inline">Token & Quyền</span>
+        </button>
+
+        <button
+          onClick={() => setIsAuditModalOpen(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold border border-hub bg-hub-card text-hub-secondary hover:text-hub-primary transition-colors shadow-2xs"
+          title="Xem nhật ký kiểm toán (Audit Trail) các thao tác điều khiển từ xa"
+        >
+          <History className="h-3.5 w-3.5 text-purple-500" />
+          <span className="hidden sm:inline">Audit Trail</span>
+          {meshAuditLogs.length > 0 && (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold">
+              {meshAuditLogs.length}
+            </span>
+          )}
+        </button>
+
         <button
           onClick={() => setIsDetailsOpen(!isDetailsOpen)}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border border-hub bg-hub-card text-hub-secondary hover:text-hub-primary transition-colors shadow-2xs"
@@ -189,6 +217,29 @@ export const MeshNodeSelector: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div className="pt-2 border-t border-hub flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      setIsDetailsOpen(false);
+                      setIsMeshSettingsOpen(true);
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold hover:underline"
+                  >
+                    <KeyRound className="h-3 w-3" />
+                    <span>Cấu hình Token</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsDetailsOpen(false);
+                      setIsAuditModalOpen(true);
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-purple-600 dark:text-purple-400 font-semibold hover:underline"
+                  >
+                    <History className="h-3 w-3" />
+                    <span>Xem Audit ({meshAuditLogs.length})</span>
+                  </button>
                 </div>
               </div>
             </div>

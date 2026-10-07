@@ -56,11 +56,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
     switchProjectTarget,
     setActiveResourceInspectorProject,
     toggleProjectShare,
+    triggerRemoteProjectAction,
   } = useAppStore();
 
   const isSelected = activeProjectId === project.id;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTargetMenuOpen, setIsTargetMenuOpen] = useState(false);
+  const [isRemoteActing, setIsRemoteActing] = useState(false);
   const isRunning = project.status === 'running';
   const isSyncing = project.status === 'syncing';
   const isBuilding = project.status === 'building';
@@ -389,60 +391,110 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
 
       {/* Fluent 2 Action Bar */}
       <div className="px-3.5 pb-3 pt-2 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between gap-1.5">
-        {/* Fluent 2 Primary Action Button: TRIGGER DEPLOY */}
-        <button
-          onClick={() => triggerSync(project.id)}
-          disabled={isSyncing}
-          className="fluent-btn-primary flex-1 h-8 text-[13px] gap-2 shadow-xs"
-          title="Đồng bộ lại source code từ Windows sang môi trường đích và redeploy"
-        >
-          <Zap className={`h-4 w-4 shrink-0 text-amber-400 fill-amber-400 ${isSyncing ? 'animate-bounce' : ''}`} />
-          <span className="font-semibold tracking-wide">{isSyncing ? 'Deploying...' : 'TRIGGER DEPLOY'}</span>
-        </button>
-
-        {/* Secondary Tool Buttons */}
-        <div className="flex items-center gap-1 shrink-0">
-          {isRunning ? (
+        {project.isRemote ? (
+          <>
+            {/* Remote Action: Hot-Sync via Mesh */}
             <button
-              onClick={() => stopProject(project.id)}
-              className="fluent-icon-btn h-8 w-8 text-hub-muted hover:text-rose-500 hover:bg-rose-500/10"
-              title="Dừng ứng dụng (Stop)"
+              onClick={async () => {
+                if (!project.nodeId) return;
+                setIsRemoteActing(true);
+                await triggerRemoteProjectAction(project.nodeId, project.id, 'sync');
+                setIsRemoteActing(false);
+              }}
+              disabled={isRemoteActing}
+              className="fluent-btn-primary flex-1 h-8 text-[13px] gap-2 shadow-xs bg-amber-600 hover:bg-amber-700"
+              title={`Gửi lệnh Hot-Sync từ xa qua mạng Mesh tới trạm ${project.nodeName || ''}`}
             >
-              <Square className="h-4 w-4" />
+              <Zap className={`h-4 w-4 shrink-0 text-white fill-current ${isRemoteActing ? 'animate-bounce' : ''}`} />
+              <span className="font-semibold tracking-wide">{isRemoteActing ? 'Đang gửi lệnh...' : 'REMOTE SYNC'}</span>
             </button>
-          ) : (
+
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Remote Action: Restart via Mesh */}
+              <button
+                onClick={async () => {
+                  if (!project.nodeId) return;
+                  setIsRemoteActing(true);
+                  await triggerRemoteProjectAction(project.nodeId, project.id, 'restart');
+                  setIsRemoteActing(false);
+                }}
+                disabled={isRemoteActing}
+                className="fluent-icon-btn h-8 w-8 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+                title={`Khởi động lại từ xa trên trạm ${project.nodeName || 'đồng nghiệp'}`}
+              >
+                <RotateCw className={`h-4 w-4 ${isRemoteActing ? 'animate-spin' : ''}`} />
+              </button>
+
+              {/* Direct Web Opening */}
+              {project.remoteUrl && (
+                <a
+                  href={project.remoteUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="fluent-icon-btn h-8 w-8 text-hub-muted hover:text-[var(--hub-accent)] hover:bg-[var(--hub-accent)]/10"
+                  title={`Mở giao diện web từ xa: ${project.remoteUrl}`}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Fluent 2 Primary Action Button: TRIGGER DEPLOY */}
             <button
-              onClick={() => startProject(project.id)}
-              disabled={isBuilding}
-              className="fluent-icon-btn h-8 w-8 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
-              title="Khởi động ứng dụng (Start)"
+              onClick={() => triggerSync(project.id)}
+              disabled={isSyncing}
+              className="fluent-btn-primary flex-1 h-8 text-[13px] gap-2 shadow-xs"
+              title="Đồng bộ lại source code từ Windows sang môi trường đích và redeploy"
             >
-              <Play className="h-4 w-4 fill-current" />
+              <Zap className={`h-4 w-4 shrink-0 text-amber-400 fill-amber-400 ${isSyncing ? 'animate-bounce' : ''}`} />
+              <span className="font-semibold tracking-wide">{isSyncing ? 'Deploying...' : 'TRIGGER DEPLOY'}</span>
             </button>
-          )}
 
-          <button
-            onClick={() => restartProject(project.id)}
-            className="fluent-icon-btn h-8 w-8 text-hub-muted hover:text-hub-primary"
-            title="Khởi động lại (Restart)"
-          >
-            <RotateCw className="h-4 w-4" />
-          </button>
+            {/* Secondary Tool Buttons */}
+            <div className="flex items-center gap-1 shrink-0">
+              {isRunning ? (
+                <button
+                  onClick={() => stopProject(project.id)}
+                  className="fluent-icon-btn h-8 w-8 text-hub-muted hover:text-rose-500 hover:bg-rose-500/10"
+                  title="Dừng ứng dụng (Stop)"
+                >
+                  <Square className="h-4 w-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => startProject(project.id)}
+                  disabled={isBuilding}
+                  className="fluent-icon-btn h-8 w-8 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                  title="Khởi động ứng dụng (Start)"
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                </button>
+              )}
 
-          <button
-            onClick={() => setActiveProject(project.id)}
-            className={`fluent-icon-btn h-8 w-8 ${
-              isSelected
-                ? 'border-[var(--hub-accent)] text-[var(--hub-accent)] bg-[var(--hub-accent)]/10'
-                : 'text-hub-muted hover:text-hub-primary'
-            }`}
-            title="Xem Terminal Console"
-          >
-            <Terminal className="h-4 w-4" />
-          </button>
+              <button
+                onClick={() => restartProject(project.id)}
+                className="fluent-icon-btn h-8 w-8 text-hub-muted hover:text-hub-primary"
+                title="Khởi động lại (Restart)"
+              >
+                <RotateCw className="h-4 w-4" />
+              </button>
 
-          {/* More Actions ("...") Fluent 2 Dropdown Menu */}
-          <div className="relative">
+              <button
+                onClick={() => setActiveProject(project.id)}
+                className={`fluent-icon-btn h-8 w-8 ${
+                  isSelected
+                    ? 'border-[var(--hub-accent)] text-[var(--hub-accent)] bg-[var(--hub-accent)]/10'
+                    : 'text-hub-muted hover:text-hub-primary'
+                }`}
+                title="Xem Terminal Console"
+              >
+                <Terminal className="h-4 w-4" />
+              </button>
+
+              {/* More Actions ("...") Fluent 2 Dropdown Menu */}
+              <div className="relative">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className={`fluent-icon-btn h-8 w-8 ${
@@ -605,7 +657,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
             )}
           </div>
         </div>
-      </div>
-    </div>
-  );
+      </>
+    )}
+  </div>
+</div>
+);
 };

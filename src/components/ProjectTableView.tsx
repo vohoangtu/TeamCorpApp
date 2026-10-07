@@ -56,10 +56,12 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
     switchProjectTarget,
     setActiveResourceInspectorProject,
     toggleProjectShare,
+    triggerRemoteProjectAction,
   } = useAppStore();
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [openTargetMenuId, setOpenTargetMenuId] = useState<string | null>(null);
+  const [remoteActingId, setRemoteActingId] = useState<string | null>(null);
 
   const statusConfig = {
     running: {
@@ -346,58 +348,105 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
 
                   {/* Actions */}
                   <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {/* Compact Trigger Deploy */}
-                      <button
-                        onClick={() => triggerSync(project.id)}
-                        disabled={isSyncing}
-                        className="fluent-btn-primary h-7 px-2.5 text-[12px] gap-1.5 shadow-xs"
-                        title="Đồng bộ lại source code từ Windows sang môi trường đích và redeploy"
-                      >
-                        <Zap className={`h-3.5 w-3.5 shrink-0 text-amber-400 fill-amber-400 ${isSyncing ? 'animate-bounce' : ''}`} />
-                        <span className="font-semibold">{isSyncing ? 'Deploying...' : 'TRIGGER DEPLOY'}</span>
-                      </button>
-
-                      {isRunning ? (
+                    {project.isRemote ? (
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Remote Action: Hot-Sync via Mesh */}
                         <button
-                          onClick={() => stopProject(project.id)}
-                          className="fluent-icon-btn h-7 w-7 text-hub-muted hover:text-rose-500 hover:bg-rose-500/10"
-                          title="Dừng ứng dụng (Stop)"
+                          onClick={async () => {
+                            if (!project.nodeId) return;
+                            setRemoteActingId(project.id);
+                            await triggerRemoteProjectAction(project.nodeId, project.id, 'sync');
+                            setRemoteActingId(null);
+                          }}
+                          disabled={remoteActingId === project.id}
+                          className="fluent-btn-primary h-7 px-2.5 text-[12px] gap-1.5 shadow-xs bg-amber-600 hover:bg-amber-700"
+                          title={`Gửi lệnh Hot-Sync từ xa qua mạng Mesh tới trạm ${project.nodeName || ''}`}
                         >
-                          <Square className="h-3.5 w-3.5" />
+                          <Zap className={`h-3.5 w-3.5 shrink-0 text-white fill-current ${remoteActingId === project.id ? 'animate-bounce' : ''}`} />
+                          <span className="font-semibold">{remoteActingId === project.id ? 'Sending...' : 'REMOTE SYNC'}</span>
                         </button>
-                      ) : (
+
+                        {/* Remote Action: Restart via Mesh */}
                         <button
-                          onClick={() => startProject(project.id)}
-                          className="fluent-icon-btn h-7 w-7 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
-                          title="Khởi chạy (Start)"
+                          onClick={async () => {
+                            if (!project.nodeId) return;
+                            setRemoteActingId(project.id);
+                            await triggerRemoteProjectAction(project.nodeId, project.id, 'restart');
+                            setRemoteActingId(null);
+                          }}
+                          disabled={remoteActingId === project.id}
+                          className="fluent-icon-btn h-7 w-7 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+                          title={`Khởi động lại từ xa trên trạm ${project.nodeName || 'đồng nghiệp'}`}
                         >
-                          <Play className="h-3.5 w-3.5 fill-current" />
+                          <RotateCw className={`h-3.5 w-3.5 ${remoteActingId === project.id ? 'animate-spin' : ''}`} />
                         </button>
-                      )}
 
-                      <button
-                        onClick={() => restartProject(project.id)}
-                        className="fluent-icon-btn h-7 w-7 text-hub-muted hover:text-hub-primary"
-                        title="Khởi động lại (Restart)"
-                      >
-                        <RotateCw className="h-3.5 w-3.5" />
-                      </button>
+                        {/* Direct Web Opening */}
+                        {project.remoteUrl && (
+                          <a
+                            href={project.remoteUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="fluent-icon-btn h-7 w-7 text-hub-muted hover:text-[var(--hub-accent)] hover:bg-[var(--hub-accent)]/10"
+                            title={`Mở giao diện web từ xa: ${project.remoteUrl}`}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Compact Trigger Deploy */}
+                        <button
+                          onClick={() => triggerSync(project.id)}
+                          disabled={isSyncing}
+                          className="fluent-btn-primary h-7 px-2.5 text-[12px] gap-1.5 shadow-xs"
+                          title="Đồng bộ lại source code từ Windows sang môi trường đích và redeploy"
+                        >
+                          <Zap className={`h-3.5 w-3.5 shrink-0 text-amber-400 fill-amber-400 ${isSyncing ? 'animate-bounce' : ''}`} />
+                          <span className="font-semibold">{isSyncing ? 'Deploying...' : 'TRIGGER DEPLOY'}</span>
+                        </button>
 
-                      <button
-                        onClick={() => setActiveProject(project.id)}
-                        className={`fluent-icon-btn h-7 w-7 ${
-                          isSelected
-                            ? 'border-[var(--hub-accent)] text-[var(--hub-accent)] bg-[var(--hub-accent)]/10'
-                            : 'text-hub-muted hover:text-hub-primary'
-                        }`}
-                        title="Xem Console Logs"
-                      >
-                        <Terminal className="h-3.5 w-3.5" />
-                      </button>
+                        {isRunning ? (
+                          <button
+                            onClick={() => stopProject(project.id)}
+                            className="fluent-icon-btn h-7 w-7 text-hub-muted hover:text-rose-500 hover:bg-rose-500/10"
+                            title="Dừng ứng dụng (Stop)"
+                          >
+                            <Square className="h-3.5 w-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => startProject(project.id)}
+                            className="fluent-icon-btn h-7 w-7 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                            title="Khởi chạy (Start)"
+                          >
+                            <Play className="h-3.5 w-3.5 fill-current" />
+                          </button>
+                        )}
 
-                      {/* More Actions Dropdown Menu */}
-                      <div className="relative">
+                        <button
+                          onClick={() => restartProject(project.id)}
+                          className="fluent-icon-btn h-7 w-7 text-hub-muted hover:text-hub-primary"
+                          title="Khởi động lại (Restart)"
+                        >
+                          <RotateCw className="h-3.5 w-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => setActiveProject(project.id)}
+                          className={`fluent-icon-btn h-7 w-7 ${
+                            isSelected
+                              ? 'border-[var(--hub-accent)] text-[var(--hub-accent)] bg-[var(--hub-accent)]/10'
+                              : 'text-hub-muted hover:text-hub-primary'
+                          }`}
+                          title="Xem Console Logs"
+                        >
+                          <Terminal className="h-3.5 w-3.5" />
+                        </button>
+
+                        {/* More Actions Dropdown Menu */}
+                        <div className="relative">
                         <button
                           onClick={() => setOpenMenuId(openMenuId === project.id ? null : project.id)}
                           className={`fluent-icon-btn h-7 w-7 ${
@@ -557,8 +606,9 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
                         )}
                       </div>
                     </div>
-                  </td>
-                </tr>
+                  )}
+                </td>
+              </tr>
               );
             })}
           </tbody>

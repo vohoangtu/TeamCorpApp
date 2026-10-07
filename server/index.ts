@@ -28,7 +28,7 @@ import { logAggregator } from './log-aggregator';
 import { gitMatrixService } from './git-matrix';
 import { windowsTuningService } from './windows-tuning';
 import { meshDiscovery } from './mesh-discovery';
-import type { CreateProjectPayload, Project, LogEntry, ProcessPriority } from '../src/types';
+import type { CreateProjectPayload, Project, LogEntry, ProcessPriority, MeshConfig, MeshAuditLog } from '../src/types';
 
 const PORT = 4100;
 const server = http.createServer();
@@ -57,6 +57,76 @@ resourceMonitor.startPolling(3000);
 logAggregator.setBroadcast(broadcast);
 meshDiscovery.setBroadcast(broadcast);
 meshDiscovery.start();
+
+// Remote action executor for peer requests (Phase 2)
+meshDiscovery.setActionExecutor(async (projectId: string, action: 'restart' | 'sync' | 'stop' | 'start') => {
+  const project = projectStore.get(projectId);
+  if (!project) throw new Error('Không tìm thấy dự án');
+
+  if (action === 'sync') {
+    return await syncEngine.triggerSync(projectId);
+  }
+
+  const targetType = project.runtimeType === 'wsl2' ? 'wsl' : project.runtimeType === 'docker' ? 'docker' : 'windows';
+
+  if (action === 'stop' || action === 'restart') {
+    if (project.runtimeType === 'native' || project.runtimeType === 'wsl2') {
+      await processManager.stop(projectId);
+    } else {
+      await dockerManager.stop(projectId, project.sourcePath, (log) => sendProjectLog(projectId, log, 'docker'));
+    }
+    project.status = 'stopped';
+    project.pid = undefined;
+    project.cpuPercent = undefined;
+    project.memoryMb = undefined;
+    projectStore.set(project);
+    broadcast('project:update', project);
+  }
+
+  if (action === 'start' || action === 'restart') {
+    if (project.runtimeType === 'native' || project.runtimeType === 'wsl2') {
+      const { pid } = processManager.start(
+        project.id,
+        project.sourcePath,
+        project.runCommand,
+        (log) => sendProjectLog(project.id, log, targetType),
+        (code) => {
+          const p = projectStore.get(project.id);
+          if (p) {
+            p.status = code === 0 ? 'stopped' : 'error';
+            p.pid = undefined;
+            projectStore.set(p);
+            broadcast('project:update', p);
+          }
+        },
+        project.runtimeType
+      );
+      project.pid = pid;
+      project.status = 'running';
+    } else {
+      dockerManager.start(
+        project.id,
+        project.sourcePath,
+        project.runCommand,
+        (log) => sendProjectLog(project.id, log, 'docker'),
+        (code) => {
+          const p = projectStore.get(project.id);
+          if (p) {
+            p.status = code === 0 ? 'stopped' : 'error';
+            p.pid = undefined;
+            projectStore.set(p);
+            broadcast('project:update', p);
+          }
+        }
+      );
+      project.status = 'running';
+    }
+    projectStore.set(project);
+    broadcast('project:update', project);
+  }
+
+  return { success: true };
+});
 
 let lastCpuMeasure = os.cpus();
 function calculateCpuUsage(): number {
@@ -106,6 +176,8 @@ wss.on('connection', async (ws) => {
   ws.send(JSON.stringify({ type: 'projects:all', payload: projectStore.getAll() }));
   ws.send(JSON.stringify({ type: 'mesh:nodes_updated', payload: meshDiscovery.getAllNodes() }));
   ws.send(JSON.stringify({ type: 'mesh:catalog_updated', payload: meshDiscovery.getTeamCatalog() }));
+  ws.send(JSON.stringify({ type: 'mesh:config_updated', payload: meshDiscovery.getConfig() }));
+  ws.send(JSON.stringify({ type: 'mesh:audit_logs_updated', payload: meshDiscovery.getAuditLogs() }));
 
   // Send system stats immediately
   try {
@@ -169,7 +241,7 @@ server.on('request', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Mesh-Token, X-Mesh-Actor-NodeId, X-Mesh-Actor-Hostname, X-Mesh-Actor-Username');
 
   if (method === 'OPTIONS') {
     res.writeHead(204);
@@ -997,6 +1069,71 @@ server.on('request', async (req, res) => {
       const shared = meshDiscovery.toggleProjectShare(projectId);
       res.writeHead(200);
       res.end(JSON.stringify({ success: true, shared }));
+      return;
+    }
+
+    // Phase 2: Mesh Security Config
+    if (pathname === '/api/mesh/config' && method === 'GET') {
+      res.writeHead(200);
+      res.end(JSON.stringify(meshDiscovery.getConfig()));
+      return;
+    }
+
+    if (pathname === '/api/mesh/config' && method === 'POST') {
+      const body = await parseBody<Partial<MeshConfig>>(req);
+      const updated = meshDiscovery.saveConfig(body);
+      res.writeHead(200);
+      res.end(JSON.stringify(updated));
+      return;
+    }
+
+    // Phase 2: Mesh Audit Logs
+    if (pathname === '/api/mesh/audit-logs' && method === 'GET') {
+      res.writeHead(200);
+      res.end(JSON.stringify(meshDiscovery.getAuditLogs()));
+      return;
+    }
+
+    if (pathname === '/api/mesh/audit-logs' && method === 'DELETE') {
+      meshDiscovery.clearAuditLogs();
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true }));
+      return;
+    }
+
+    // Phase 2: Execute Local Action (called by remote peer via HTTP POST)
+    if (pathname === '/api/mesh/execute-local-action' && method === 'POST') {
+      const rawForwarded = req.headers['x-forwarded-for'];
+      const actorIp = (Array.isArray(rawForwarded) ? rawForwarded[0] : rawForwarded) || req.socket.remoteAddress || 'unknown';
+      const actorNodeId = req.headers['x-mesh-actor-nodeid'] as string;
+      const actorHostname = req.headers['x-mesh-actor-hostname'] as string;
+      const actorUsername = req.headers['x-mesh-actor-username'] as string;
+      const token = req.headers['x-mesh-token'] as string;
+
+      const body = await parseBody<{ projectId: string; action: 'restart' | 'sync' | 'stop' | 'start' }>(req);
+      const result = await meshDiscovery.executeLocalActionFromPeer({
+        actorIp,
+        actorNodeId,
+        actorHostname,
+        actorUsername,
+        token,
+        projectId: body.projectId,
+        action: body.action,
+      });
+
+      res.writeHead(result.success ? 200 : 403);
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    // Phase 2: Forward Remote Action to Peer (called by local frontend)
+    const nodeActionMatch = pathname.match(/^\/api\/mesh\/nodes\/([^/]+)\/action$/);
+    if (nodeActionMatch && method === 'POST') {
+      const targetNodeId = nodeActionMatch[1];
+      const body = await parseBody<{ projectId: string; action: 'restart' | 'sync' | 'stop' | 'start' }>(req);
+      const result = await meshDiscovery.dispatchActionToPeer(targetNodeId, body.projectId, body.action);
+      res.writeHead(result.success ? 200 : 400);
+      res.end(JSON.stringify(result));
       return;
     }
 

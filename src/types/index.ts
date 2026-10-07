@@ -435,3 +435,35 @@ export interface MeshNode {
   isSelf?: boolean;
   apps?: Project[];
 }
+
+export interface MeshConfig {
+  teamToken: string;
+  allowRemoteControl: boolean;
+  requireToken: boolean;
+  hostId?: string;
+}
+
+export interface MeshAuditLog {
+  id: string;
+  timestamp: number;
+  action: 'restart' | 'sync' | 'stop' | 'start';
+  actorIp: string;
+  actorHostname: string;
+  actorUsername: string;
+  targetProjectId: string;
+  targetProjectName: string;
+  status: 'success' | 'failed' | 'rejected';
+  reason?: string;
+}
+
+export interface MeshRemoteNotification {
+  id: string;
+  timestamp: number;
+  type: 'action_received' | 'action_executed';
+  title: string;
+  message: string;
+  actor: string;
+  action: string;
+  projectName: string;
+}
+
