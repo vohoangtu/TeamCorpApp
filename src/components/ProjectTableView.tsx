@@ -394,6 +394,23 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
                           <Terminal className="h-3.5 w-3.5" />
                         </button>
 
+                        {/* Remote Action: Inspect .env Schema & Template */}
+                        <button
+                          onClick={() => {
+                            setActiveEnvProject({
+                              id: project.id,
+                              name: project.name,
+                              nodeId: project.nodeId,
+                              nodeName: project.nodeName,
+                              isRemote: true,
+                            });
+                          }}
+                          className="fluent-icon-btn h-7 w-7 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                          title={`Khám phá .env Schema & Template cấu hình của ${project.name} trên ${project.nodeName || 'Remote'}`}
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                        </button>
+
                         {/* Direct Web Opening */}
                         {project.remoteUrl && (
                           <a

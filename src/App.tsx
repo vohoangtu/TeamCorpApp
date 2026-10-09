@@ -538,6 +538,9 @@ export const App: React.FC = () => {
         isOpen={!!activeEnvProject}
         projectId={activeEnvProject?.id || null}
         projectName={activeEnvProject?.name || ''}
+        isRemote={activeEnvProject?.isRemote}
+        nodeId={activeEnvProject?.nodeId}
+        nodeName={activeEnvProject?.nodeName}
         onClose={() => setActiveEnvProject(null)}
       />
 

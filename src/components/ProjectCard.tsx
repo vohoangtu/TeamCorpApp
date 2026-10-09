@@ -438,6 +438,23 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
                 <Terminal className="h-4 w-4" />
               </button>
 
+              {/* Remote Action: Inspect .env Schema & Template */}
+              <button
+                onClick={() => {
+                  setActiveEnvProject({
+                    id: project.id,
+                    name: project.name,
+                    nodeId: project.nodeId,
+                    nodeName: project.nodeName,
+                    isRemote: true,
+                  });
+                }}
+                className="fluent-icon-btn h-8 w-8 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                title={`Khám phá .env Schema & Template cấu hình của ${project.name} trên ${project.nodeName || 'Remote'}`}
+              >
+                <KeyRound className="h-4 w-4" />
+              </button>
+
               {/* Direct Web Opening */}
               {project.remoteUrl && (
                 <a

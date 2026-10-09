@@ -4,8 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { exec } from 'node:child_process';
-import type { MeshNode, Project, MeshConfig, MeshAuditLog, LogEntry } from '../src/types';
+import type { MeshNode, Project, MeshConfig, MeshAuditLog, LogEntry, EnvData } from '../src/types';
 import { projectStore } from './store';
+import { logAggregator } from './log-aggregator';
 
 const UDP_PORT = 4105;
 const HTTP_PORT = 4100;
@@ -349,6 +350,57 @@ export class MeshDiscoveryService {
     });
   }
 
+  public async fetchPeerProjectEnvSchema(targetNodeId: string, projectId: string): Promise<EnvData | null> {
+    const peer = this.peers.get(targetNodeId);
+    if (!peer) {
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      const options = {
+        hostname: peer.ip,
+        port: peer.port,
+        path: `/api/mesh/projects/${encodeURIComponent(projectId)}/env-schema`,
+        method: 'GET',
+        headers: {
+          'X-Mesh-Token': this.config.teamToken,
+          'X-Mesh-Actor-NodeId': this.hostId,
+          'X-Mesh-Actor-Hostname': os.hostname(),
+          'X-Mesh-Actor-Username': os.userInfo().username || 'developer',
+        },
+        timeout: 5000,
+      };
+
+      const req = http.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            if (data && data.items) {
+              resolve({
+                ...data,
+                nodeName: peer.name,
+              });
+            } else {
+              resolve(null);
+            }
+          } catch {
+            resolve(null);
+          }
+        });
+      });
+
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(null);
+      });
+
+      req.end();
+    });
+  }
+
   // Detects best local LAN IPv4 address (e.g. 192.168.x.x, 10.x.x.x)
   public getLocalLanIp(): string {
     const interfaces = os.networkInterfaces();
@@ -621,14 +673,19 @@ export class MeshDiscoveryService {
 
   public async fetchPeerApps(peer: MeshNode): Promise<Project[]> {
     return new Promise((resolve) => {
+      const startTime = Date.now();
       const req = http.get(
         `http://${peer.ip}:${peer.port}/api/mesh/shared-apps`,
-        { timeout: 2000 },
+        { timeout: 3500 },
         (res) => {
           if (res.statusCode !== 200) {
             resolve([]);
             return;
           }
+          const latency = Math.max(1, Date.now() - startTime);
+          peer.latencyMs = latency;
+          peer.status = 'online';
+
           let data = '';
           res.on('data', (chunk) => (data += chunk));
           res.on('end', () => {
@@ -647,8 +704,29 @@ export class MeshDiscoveryService {
               peer.apps = enriched;
               peer.sharedAppCount = enriched.length;
               this.peerApps.set(peer.id, enriched);
+
+              // Pull logs for running peer applications into Unified Log Aggregator
+              for (const app of enriched) {
+                if (app.status === 'running') {
+                  this.fetchPeerProjectLogs(peer.id, app.id)
+                    .then((logs) => {
+                      if (logs && logs.length > 0) {
+                        for (const log of logs) {
+                          logAggregator.addRemoteLog(app.id, app.name, log, {
+                            nodeId: peer.id,
+                            nodeName: peer.name,
+                            connectionType: peer.connectionType === 'lan' ? 'lan' : 'remote_tailscale',
+                          });
+                        }
+                      }
+                    })
+                    .catch(() => {});
+                }
+              }
+
               resolve(enriched);
               this.notify('mesh:catalog_updated', this.getTeamCatalog());
+              this.notify('mesh:nodes_updated', this.getAllNodes());
             } catch {
               resolve([]);
             }
@@ -656,9 +734,13 @@ export class MeshDiscoveryService {
         }
       );
 
-      req.on('error', () => resolve([]));
+      req.on('error', () => {
+        peer.status = 'offline';
+        resolve([]);
+      });
       req.on('timeout', () => {
         req.destroy();
+        peer.status = 'offline';
         resolve([]);
       });
     });

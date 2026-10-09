@@ -12,7 +12,10 @@ import {
   Info, 
   ArrowDown, 
   Maximize2,
-  RefreshCw
+  RefreshCw,
+  Wifi,
+  Globe,
+  Laptop
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import type { LogLevel } from '../types';
@@ -23,10 +26,13 @@ export const UnifiedLogsView: React.FC = () => {
     fetchAggregatedLogs, 
     clearAggregatedLogs, 
     projects, 
+    teamCatalog,
+    meshNodes,
     setActiveCopilot,
     setIsUnifiedLogsOpen 
   } = useAppStore();
 
+  const [selectedNodeId, setSelectedNodeId] = useState<string>('all');
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<LogLevel[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,8 +57,70 @@ export const UnifiedLogsView: React.FC = () => {
     prevLogsLength.current = aggregatedLogs.length;
   }, [aggregatedLogs, autoScroll]);
 
+  // Combined services (local + remote from teamCatalog)
+  const allServices = useMemo(() => {
+    const list: Array<{ 
+      id: string; 
+      name: string; 
+      status?: string; 
+      isRemote?: boolean; 
+      nodeName?: string; 
+      connectionType?: string 
+    }> = [
+      ...projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        isRemote: false,
+        nodeName: 'Local PC',
+      })),
+    ];
+    for (const remote of teamCatalog) {
+      if (!list.some((item) => item.id === remote.id)) {
+        list.push({
+          id: remote.id,
+          name: remote.name,
+          status: remote.status,
+          isRemote: true,
+          nodeName: remote.nodeName,
+          connectionType: remote.connectionType,
+        });
+      }
+    }
+    return list;
+  }, [projects, teamCatalog]);
+
+  // Available workstations / nodes
+  const availableNodes = useMemo(() => {
+    const nodes: Array<{ 
+      id: string; 
+      name: string; 
+      connectionType?: string; 
+      latencyMs?: number 
+    }> = [
+      { id: 'all', name: 'Tất cả máy trạm' },
+      { id: 'local', name: 'Máy này (Local)' },
+    ];
+    for (const node of meshNodes) {
+      if (!nodes.some((n) => n.id === node.id)) {
+        nodes.push({
+          id: node.id,
+          name: node.name,
+          connectionType: node.connectionType,
+          latencyMs: node.latencyMs,
+        });
+      }
+    }
+    return nodes;
+  }, [meshNodes]);
+
   const filteredLogs = useMemo(() => {
     return aggregatedLogs.filter((log) => {
+      // Node filter
+      if (selectedNodeId !== 'all') {
+        if (selectedNodeId === 'local' && log.isRemote) return false;
+        if (selectedNodeId !== 'local' && log.nodeId !== selectedNodeId) return false;
+      }
       if (selectedProjectIds.length > 0 && !selectedProjectIds.includes(log.projectId)) {
         return false;
       }
@@ -63,12 +131,13 @@ export const UnifiedLogsView: React.FC = () => {
         const q = searchQuery.toLowerCase().trim();
         const matchesMsg = log.message.toLowerCase().includes(q);
         const matchesProj = log.projectName.toLowerCase().includes(q);
+        const matchesNode = log.nodeName ? log.nodeName.toLowerCase().includes(q) : false;
         const matchesCorr = log.correlationId ? log.correlationId.toLowerCase().includes(q) : false;
-        if (!matchesMsg && !matchesProj && !matchesCorr) return false;
+        if (!matchesMsg && !matchesProj && !matchesNode && !matchesCorr) return false;
       }
       return true;
     });
-  }, [aggregatedLogs, selectedProjectIds, selectedLevels, searchQuery]);
+  }, [aggregatedLogs, selectedNodeId, selectedProjectIds, selectedLevels, searchQuery]);
 
   const projectStats = useMemo(() => {
     const stats: Record<string, number> = {};
@@ -106,6 +175,13 @@ export const UnifiedLogsView: React.FC = () => {
     params.set('format', format);
     if (selectedProjectIds.length > 0) params.set('projectIds', selectedProjectIds.join(','));
     if (selectedLevels.length > 0) params.set('levels', selectedLevels.join(','));
+    if (selectedNodeId !== 'all') {
+      if (selectedNodeId === 'local') {
+        params.set('includeRemote', 'false');
+      } else {
+        params.set('nodeIds', selectedNodeId);
+      }
+    }
     if (searchQuery) params.set('search', searchQuery);
 
     const link = document.createElement('a');
@@ -121,13 +197,13 @@ export const UnifiedLogsView: React.FC = () => {
     const recentErrors = filteredLogs.filter((l) => l.level === 'error').slice(-15);
     const contextLogs = recentErrors.length > 0 ? recentErrors : filteredLogs.slice(-25);
     const formatted = contextLogs
-      .map((l) => `[${l.projectName}] [${l.level.toUpperCase()}] ${l.message.trim()}`)
+      .map((l) => `[${l.isRemote ? (l.nodeName || 'Peer Remote') : 'Local PC'}] [${l.projectName}] [${l.level.toUpperCase()}] ${l.message.trim()}`)
       .join('\n');
 
     setActiveCopilot({
       isOpen: true,
       initialLogText: formatted,
-      projectName: 'Tất cả Microservices (Multi-Service Causality)',
+      projectName: 'Toàn bộ Máy Trạm & Microservices (Multi-Node Causality)',
     });
   };
 
@@ -144,14 +220,14 @@ export const UnifiedLogsView: React.FC = () => {
               <h2 className="text-[15px] font-semibold tracking-tight">Unified Log Stream</h2>
               <span className="rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[11px] font-semibold flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Local Datadog Stream
+                Live Team Mesh Stream
               </span>
               <span className="text-[12px] text-hub-muted font-mono">
                 {filteredLogs.length} / {aggregatedLogs.length} events
               </span>
             </div>
             <p className="text-[12px] text-hub-muted">
-              Tổng hợp thời gian thực luồng console của các microservices đang chạy — Truy vết nguyên nhân lỗi dây chuyền
+              Tổng hợp thời gian thực luồng console của local PC và các máy trạm đồng nghiệp (LAN / Tailscale VPN) — Truy vết nguyên nhân lỗi dây chuyền
             </p>
           </div>
         </div>
@@ -160,7 +236,7 @@ export const UnifiedLogsView: React.FC = () => {
           <button
             onClick={handleDiagnoseWithCopilot}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition-colors"
-            title="Chẩn đoán lỗi đa dịch vụ bằng AI Copilot"
+            title="Chẩn đoán lỗi đa máy trạm & microservices bằng AI Copilot"
           >
             <Sparkles className="h-3.5 w-3.5" />
             <span>AI Causality Copilot</span>
@@ -207,6 +283,45 @@ export const UnifiedLogsView: React.FC = () => {
         </div>
       </div>
 
+      {/* Workstations / Mesh Nodes Filter Bar */}
+      <div className="px-5 py-2 border-b border-hub bg-black/[0.02] dark:bg-white/[0.03] flex items-center gap-2 overflow-x-auto shrink-0">
+        <span className="text-[11px] font-bold text-hub-muted uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+          <Laptop className="h-3 w-3" /> Trạm Máy (Mesh):
+        </span>
+        {availableNodes.map((n) => {
+          const isSelected = selectedNodeId === n.id;
+          return (
+            <button
+              key={n.id}
+              onClick={() => setSelectedNodeId(n.id)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all shrink-0 ${
+                isSelected
+                  ? 'bg-[var(--hub-accent)] text-white shadow-xs font-semibold'
+                  : 'bg-black/[0.04] dark:bg-white/[0.06] text-hub-muted hover:text-hub-primary border border-hub'
+              }`}
+            >
+              {n.id === 'all' ? (
+                <span>Tất cả máy trạm</span>
+              ) : n.id === 'local' ? (
+                <span>🪟 Local PC (Máy này)</span>
+              ) : (
+                <>
+                  {n.connectionType === 'lan' ? (
+                    <Wifi className="h-3 w-3 text-emerald-400" />
+                  ) : (
+                    <Globe className="h-3 w-3 text-blue-400" />
+                  )}
+                  <span>{n.name}</span>
+                  {n.latencyMs !== undefined && (
+                    <span className="text-[10px] opacity-80 font-mono">({n.latencyMs}ms)</span>
+                  )}
+                </>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Filter Bar: Service Chips & Level Filters */}
       <div className="px-5 py-2.5 border-b border-hub bg-black/[0.01] dark:bg-white/[0.02] flex flex-wrap items-center justify-between gap-3 shrink-0">
         {/* Service Chips */}
@@ -216,22 +331,22 @@ export const UnifiedLogsView: React.FC = () => {
           </span>
           <button
             onClick={() => setSelectedProjectIds([])}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all ${
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all shrink-0 ${
               selectedProjectIds.length === 0
                 ? 'bg-[var(--hub-accent)] text-white shadow-xs font-semibold'
                 : 'bg-black/[0.04] dark:bg-white/[0.06] text-hub-muted hover:text-hub-primary'
             }`}
           >
-            Tất cả ({projects.length})
+            Tất cả ({allServices.length})
           </button>
-          {projects.map((p) => {
+          {allServices.map((p) => {
             const isSelected = selectedProjectIds.includes(p.id);
             const count = projectStats[p.id] || 0;
             return (
               <button
                 key={p.id}
                 onClick={() => toggleProject(p.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-all shrink-0 ${
                   isSelected
                     ? 'border-[var(--hub-accent)] bg-[var(--hub-accent)]/15 text-[var(--hub-accent)] font-semibold'
                     : 'border-hub bg-black/[0.02] dark:bg-white/[0.03] text-hub-secondary hover:text-hub-primary'
@@ -242,6 +357,11 @@ export const UnifiedLogsView: React.FC = () => {
                   style={{ backgroundColor: p.status === 'running' ? '#10B981' : '#94A3B8' }}
                 />
                 <span className="truncate max-w-[120px]">{p.name}</span>
+                {p.isRemote && (
+                  <span className="text-[9px] px-1 rounded bg-black/10 dark:bg-white/10 text-hub-muted font-mono">
+                    {p.connectionType === 'lan' ? '📶' : '🌐'} {p.nodeName}
+                  </span>
+                )}
                 <span className="text-[10px] opacity-70">({count})</span>
               </button>
             );
@@ -361,6 +481,30 @@ export const UnifiedLogsView: React.FC = () => {
                     {timeStr}
                   </span>
 
+                  {/* Workstation Node Tag */}
+                  {entry.isRemote ? (
+                    <span 
+                      className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold uppercase border shrink-0 ${
+                        entry.connectionType === 'lan'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                      }`}
+                      title={`Nguồn log từ máy trạm: ${entry.nodeName || 'Remote'}`}
+                    >
+                      {entry.connectionType === 'lan' ? (
+                        <Wifi className="h-2.5 w-2.5" />
+                      ) : (
+                        <Globe className="h-2.5 w-2.5" />
+                      )}
+                      <span className="truncate max-w-[85px]">{entry.nodeName || 'REMOTE'}</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-neutral-400 bg-neutral-800/80 px-1.5 py-0.2 rounded shrink-0 border border-neutral-700/50">
+                      <Laptop className="h-2.5 w-2.5 text-neutral-500" />
+                      <span>LOCAL</span>
+                    </span>
+                  )}
+
                   <span 
                     className={`w-1 shrink-0 self-stretch rounded-full my-0.5 ${
                       isSameSecond ? 'opacity-80' : 'opacity-40'
@@ -413,7 +557,7 @@ export const UnifiedLogsView: React.FC = () => {
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Bộ nhớ vòng lưu trữ tối đa 1,500 sự kiện gần nhất
+            Bộ nhớ vòng lưu trữ tối đa 1,500 sự kiện gần nhất trên toàn bộ mesh
           </span>
         </div>
 

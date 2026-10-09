@@ -64,9 +64,20 @@ export class LogAggregator {
     return match ? match[1] : undefined;
   }
 
-  add(projectId: string, log: LogEntry, target: 'windows' | 'wsl' | 'docker' = 'windows'): AggregatedLogEntry {
+  add(
+    projectId: string,
+    log: LogEntry,
+    target: 'windows' | 'wsl' | 'docker' = 'windows',
+    nodeInfo?: {
+      nodeId?: string;
+      nodeName?: string;
+      isRemote?: boolean;
+      connectionType?: 'local' | 'lan' | 'remote_tailscale';
+      projectName?: string;
+    }
+  ): AggregatedLogEntry {
     const project = projectStore.get(projectId);
-    const projectName = project ? project.name : projectId;
+    const projectName = nodeInfo?.projectName || (project ? project.name : projectId);
     const projectColor = this.getColorForProject(projectId);
     const level = this.detectLevel(log.text, log.stream);
     const correlationId = this.extractCorrelationId(log.text);
@@ -85,6 +96,59 @@ export class LogAggregator {
       timestamp: log.timestamp || new Date().toISOString(),
       sequence: this.sequenceCounter,
       correlationId,
+      nodeId: nodeInfo?.nodeId,
+      nodeName: nodeInfo?.nodeName,
+      isRemote: nodeInfo?.isRemote,
+      connectionType: nodeInfo?.connectionType,
+    };
+
+    this.buffer.push(entry);
+    if (this.buffer.length > this.maxBufferSize) {
+      this.buffer.shift();
+    }
+
+    if (this.broadcastFn) {
+      this.broadcastFn('log:aggregated', entry);
+    }
+
+    return entry;
+  }
+
+  addRemoteLog(
+    projectId: string,
+    projectName: string,
+    log: LogEntry,
+    nodeInfo: {
+      nodeId: string;
+      nodeName: string;
+      connectionType: 'lan' | 'remote_tailscale';
+    }
+  ): AggregatedLogEntry {
+    const existing = this.buffer.find((e) => e.id === log.id);
+    if (existing) return existing;
+
+    const projectColor = this.getColorForProject(projectId);
+    const level = this.detectLevel(log.text, log.stream);
+    const correlationId = this.extractCorrelationId(log.text);
+
+    this.sequenceCounter++;
+
+    const entry: AggregatedLogEntry = {
+      id: log.id || crypto.randomUUID(),
+      projectId,
+      projectName,
+      projectColor,
+      target: 'windows',
+      level,
+      stream: log.stream,
+      message: log.text,
+      timestamp: log.timestamp || new Date().toISOString(),
+      sequence: this.sequenceCounter,
+      correlationId,
+      nodeId: nodeInfo.nodeId,
+      nodeName: nodeInfo.nodeName,
+      isRemote: true,
+      connectionType: nodeInfo.connectionType,
     };
 
     this.buffer.push(entry);
@@ -109,6 +173,18 @@ export class LogAggregator {
       result = result.filter((e) => allowed.has(e.projectId));
     }
 
+    if (filter.nodeIds && filter.nodeIds.length > 0) {
+      const allowedNodes = new Set(filter.nodeIds);
+      result = result.filter((e) => {
+        const id = e.nodeId || 'local';
+        return allowedNodes.has(id);
+      });
+    }
+
+    if (filter.includeRemote === false) {
+      result = result.filter((e) => !e.isRemote);
+    }
+
     if (filter.levels && filter.levels.length > 0) {
       const allowedLevels = new Set(filter.levels);
       result = result.filter((e) => allowedLevels.has(e.level));
@@ -120,6 +196,7 @@ export class LogAggregator {
         (e) =>
           e.message.toLowerCase().includes(q) ||
           e.projectName.toLowerCase().includes(q) ||
+          (e.nodeName && e.nodeName.toLowerCase().includes(q)) ||
           (e.correlationId && e.correlationId.toLowerCase().includes(q))
       );
     }
@@ -148,7 +225,7 @@ export class LogAggregator {
     return logs
       .map(
         (l) =>
-          `[${l.timestamp}] [${l.projectName.padEnd(16)}] [${l.target.toUpperCase()}] [${l.level.toUpperCase()}]: ${l.message.trimEnd()}`
+          `[${l.timestamp}] [${(l.nodeName || 'LOCAL').padEnd(14)}] [${l.projectName.padEnd(16)}] [${l.target.toUpperCase()}] [${l.level.toUpperCase()}]: ${l.message.trimEnd()}`
       )
       .join('\n');
   }

@@ -954,13 +954,17 @@ server.on('request', async (req, res) => {
       if (method === 'GET') {
         const projectIdsParam = parsedUrl.searchParams.get('projectIds');
         const levelsParam = parsedUrl.searchParams.get('levels');
+        const nodeIdsParam = parsedUrl.searchParams.get('nodeIds');
+        const includeRemoteParam = parsedUrl.searchParams.get('includeRemote');
         const search = parsedUrl.searchParams.get('search') || undefined;
         const limit = parseInt(parsedUrl.searchParams.get('limit') || '500', 10);
 
         const projectIds = projectIdsParam ? projectIdsParam.split(',').filter(Boolean) : undefined;
         const levels = levelsParam ? (levelsParam.split(',').filter(Boolean) as any) : undefined;
+        const nodeIds = nodeIdsParam ? nodeIdsParam.split(',').filter(Boolean) : undefined;
+        const includeRemote = includeRemoteParam !== null ? includeRemoteParam === 'true' : undefined;
 
-        const logs = logAggregator.getLogs({ projectIds, levels, search, limit });
+        const logs = logAggregator.getLogs({ projectIds, levels, search, limit, nodeIds, includeRemote });
         res.writeHead(200);
         res.end(JSON.stringify(logs));
         return;
@@ -978,11 +982,15 @@ server.on('request', async (req, res) => {
       const format = parsedUrl.searchParams.get('format') || 'text';
       const projectIdsParam = parsedUrl.searchParams.get('projectIds');
       const levelsParam = parsedUrl.searchParams.get('levels');
+      const nodeIdsParam = parsedUrl.searchParams.get('nodeIds');
+      const includeRemoteParam = parsedUrl.searchParams.get('includeRemote');
       const search = parsedUrl.searchParams.get('search') || undefined;
       const projectIds = projectIdsParam ? projectIdsParam.split(',').filter(Boolean) : undefined;
       const levels = levelsParam ? (levelsParam.split(',').filter(Boolean) as any) : undefined;
+      const nodeIds = nodeIdsParam ? nodeIdsParam.split(',').filter(Boolean) : undefined;
+      const includeRemote = includeRemoteParam !== null ? includeRemoteParam === 'true' : undefined;
 
-      const filter = { projectIds, levels, search };
+      const filter = { projectIds, levels, search, nodeIds, includeRemote };
 
       if (format === 'json') {
         const data = logAggregator.exportAsJson(filter);
@@ -1222,6 +1230,44 @@ server.on('request', async (req, res) => {
       const logs = await meshDiscovery.fetchPeerProjectLogs(targetNodeId, targetProjectId);
       res.writeHead(200);
       res.end(JSON.stringify(logs));
+      return;
+    }
+
+    // Safe Remote .env Schema - Host endpoint (serves masked schema to authenticated peer)
+    const meshEnvSchemaMatch = pathname.match(/^\/api\/mesh\/projects\/([^/]+)\/env-schema$/);
+    if (meshEnvSchemaMatch && method === 'GET') {
+      const targetProjectId = meshEnvSchemaMatch[1];
+      const token = req.headers['x-mesh-token'] as string;
+      if (meshDiscovery.getConfig().requireToken && token !== meshDiscovery.getConfig().teamToken) {
+        res.writeHead(403);
+        res.end(JSON.stringify({ error: 'Team Token xác thực không hợp lệ' }));
+        return;
+      }
+      const proj = projectStore.get(targetProjectId);
+      if (!proj) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Không tìm thấy dự án' }));
+        return;
+      }
+      const schema = envManager.getSanitizedSchema(proj.sourcePath);
+      res.writeHead(200);
+      res.end(JSON.stringify(schema));
+      return;
+    }
+
+    // Safe Remote .env Schema - Local proxy endpoint (called by local frontend)
+    const nodeEnvSchemaMatch = pathname.match(/^\/api\/mesh\/nodes\/([^/]+)\/projects\/([^/]+)\/env-schema$/);
+    if (nodeEnvSchemaMatch && method === 'GET') {
+      const targetNodeId = nodeEnvSchemaMatch[1];
+      const targetProjectId = nodeEnvSchemaMatch[2];
+      const schema = await meshDiscovery.fetchPeerProjectEnvSchema(targetNodeId, targetProjectId);
+      if (!schema) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Không thể lấy cấu hình env từ trạm đích' }));
+        return;
+      }
+      res.writeHead(200);
+      res.end(JSON.stringify(schema));
       return;
     }
 

@@ -10,6 +10,8 @@ import type {
   ProjectResourceTelemetry,
   ResourcesSummary,
   AggregatedLogEntry,
+  AggregatedLogFilter,
+  EnvData,
   GitMatrixRepo,
   GitMatrixBatchResult,
   ProcessPriority,
@@ -49,6 +51,7 @@ interface AppState {
     action: 'restart' | 'sync' | 'stop' | 'start'
   ) => Promise<{ success: boolean; message?: string; error?: string }>;
   fetchRemoteProjectLogs: (nodeId: string, projectId: string) => Promise<LogEntry[]>;
+  fetchRemoteEnvSchema: (nodeId: string, projectId: string) => Promise<EnvData | null>;
 
   projects: Project[];
   activeProjectId: string | null;
@@ -70,7 +73,7 @@ interface AppState {
   isUnifiedLogsOpen: boolean;
   isGitMatrixOpen: boolean;
   isWindowsTuningOpen: boolean;
-  activeEnvProject: { id: string; name: string } | null;
+  activeEnvProject: { id: string; name: string; nodeId?: string; nodeName?: string; isRemote?: boolean } | null;
   activeCleanerProject: { id: string; name: string } | null;
   activeScriptsProject: { id: string; name: string } | null;
   activeDbProject: { id: string; name: string } | null;
@@ -106,7 +109,7 @@ interface AppState {
   aggregatedLogs: AggregatedLogEntry[];
   addAggregatedLog: (entry: AggregatedLogEntry) => void;
   clearAggregatedLogs: () => void;
-  fetchAggregatedLogs: (filter?: { projectIds?: string[]; levels?: string[]; search?: string }) => Promise<void>;
+  fetchAggregatedLogs: (filter?: AggregatedLogFilter) => Promise<void>;
 
   // Pillar 4: Cross-Repo Git Matrix
   gitMatrix: GitMatrixRepo[];
@@ -126,7 +129,7 @@ interface AppState {
   setProjectPriority: (projectId: string, priority: ProcessPriority, isEcoMode: boolean) => Promise<{ success: boolean; message: string }>;
   batchSetEcoMode: (enable: boolean) => Promise<{ success: boolean; affectedCount: number }>;
 
-  setActiveEnvProject: (proj: { id: string; name: string } | null) => void;
+  setActiveEnvProject: (proj: { id: string; name: string; nodeId?: string; nodeName?: string; isRemote?: boolean } | null) => void;
   setActiveCleanerProject: (proj: { id: string; name: string } | null) => void;
   setActiveScriptsProject: (proj: { id: string; name: string } | null) => void;
   setActiveDbProject: (proj: { id: string; name: string } | null) => void;
@@ -465,7 +468,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       const params = new URLSearchParams();
       if (filter?.projectIds?.length) params.set('projectIds', filter.projectIds.join(','));
       if (filter?.levels?.length) params.set('levels', filter.levels.join(','));
+      if (filter?.nodeIds?.length) params.set('nodeIds', filter.nodeIds.join(','));
+      if (filter?.includeRemote !== undefined) params.set('includeRemote', String(filter.includeRemote));
       if (filter?.search) params.set('search', filter.search);
+      if (filter?.limit) params.set('limit', String(filter.limit));
       const res = await fetch(`/api/logs/aggregated?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
@@ -759,6 +765,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       console.error('Failed to fetch remote project logs', e);
       return [];
+    }
+  },
+
+  fetchRemoteEnvSchema: async (nodeId, projectId) => {
+    try {
+      const res = await fetch(`/api/mesh/nodes/${nodeId}/projects/${projectId}/env-schema`);
+      if (res.ok) {
+        const data: EnvData = await res.json();
+        return data;
+      }
+      return null;
+    } catch (e) {
+      console.error('Failed to fetch remote env schema', e);
+      return null;
     }
   },
 

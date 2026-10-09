@@ -112,6 +112,30 @@ export class EnvManager {
     fs.writeFileSync(filePath, content, 'utf-8');
     return { success: true, filePath };
   }
+
+  getSanitizedSchema(dir: string): EnvData {
+    const env = this.getEnv(dir);
+    return {
+      filePath: '.env.example (Masked Remote Schema)',
+      fileName: env.fileName || '.env.example',
+      exists: env.exists,
+      items: env.items.map((item) => ({
+        key: item.key,
+        value: item.isSecret ? '[PROTECTED_REMOTE_SECRET]' : item.value,
+        isSecret: item.isSecret,
+        comment: item.comment,
+      })),
+      raw: env.items
+        .map(
+          (item) =>
+            `${item.comment ? '# ' + item.comment + '\n' : ''}${item.key}=${
+              item.isSecret ? '[PROTECTED_REMOTE_SECRET]' : item.value
+            }`
+        )
+        .join('\n'),
+      isRemoteSchema: true,
+    };
+  }
 }
 
 export const envManager = new EnvManager();

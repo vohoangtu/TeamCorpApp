@@ -134,6 +134,8 @@ export interface EnvData {
   exists: boolean;
   items: EnvItem[];
   raw: string;
+  isRemoteSchema?: boolean;
+  nodeName?: string;
 }
 
 export interface GitStatus {
@@ -367,6 +369,10 @@ export interface AggregatedLogEntry {
   timestamp: string;
   sequence: number;
   correlationId?: string;
+  nodeId?: string;
+  nodeName?: string;
+  isRemote?: boolean;
+  connectionType?: 'local' | 'lan' | 'remote_tailscale';
 }
 
 export interface AggregatedLogFilter {
@@ -375,6 +381,8 @@ export interface AggregatedLogFilter {
   search?: string;
   startTime?: string;
   limit?: number;
+  nodeIds?: string[];
+  includeRemote?: boolean;
 }
 
 // --- 🌿 PILLAR 4: CROSS-REPO GIT MATRIX ---
