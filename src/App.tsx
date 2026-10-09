@@ -33,8 +33,9 @@ import { SettingsView } from './components/SettingsView';
 import { MeshNodeSelector } from './components/MeshNodeSelector';
 import { MeshAuditModal } from './components/MeshAuditModal';
 import { MeshSettingsModal } from './components/MeshSettingsModal';
+import { TeamApiRunnerModal } from './components/TeamApiRunnerModal';
 import { useAppStore } from './store/useAppStore';
-import { Plus, FolderGit2, Zap, Search, List, LayoutGrid } from 'lucide-react';
+import { Plus, FolderGit2, Zap, Search, List, LayoutGrid, Radio } from 'lucide-react';
 
 export const App: React.FC = () => {
   const { 
@@ -42,7 +43,11 @@ export const App: React.FC = () => {
     searchQuery, 
     setSearchQuery,
     fetchProjects, 
-    connectWebSocket, 
+    connectWebSocket,
+    isTeamApiRunnerOpen,
+    setIsTeamApiRunnerOpen,
+    activeApiRunnerProject,
+    setActiveApiRunnerProject, 
     setIsAddModalOpen,
     triggerSync,
     viewMode,
@@ -402,6 +407,19 @@ export const App: React.FC = () => {
                     </button>
                   )}
 
+                  {/* P2P Team API Runner & Postman */}
+                  <button
+                    onClick={() => {
+                      setActiveApiRunnerProject(null);
+                      setIsTeamApiRunnerOpen(true);
+                    }}
+                    className="fluent-btn-standard flex h-8.5 items-center gap-1.5 px-2.5 text-[12.5px] font-semibold text-sky-600 dark:text-sky-400 border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 transition-all shadow-xs"
+                    title="Mở P2P API Runner & Smart Mock Engine (Test API liên máy trạm)"
+                  >
+                    <Radio className="h-3.5 w-3.5" />
+                    <span>API Runner</span>
+                  </button>
+
                   {/* Primary Action Button: + Thêm ứng dụng */}
                   <button
                     onClick={() => setIsAddModalOpen(true)}
@@ -647,6 +665,16 @@ export const App: React.FC = () => {
 
       {/* Mesh Security & Remote Policy Settings Modal */}
       <MeshSettingsModal />
+
+      {/* Team API Runner & Smart Mock Engine Modal */}
+      <TeamApiRunnerModal
+        isOpen={isTeamApiRunnerOpen}
+        initialProject={activeApiRunnerProject}
+        onClose={() => {
+          setIsTeamApiRunnerOpen(false);
+          setActiveApiRunnerProject(null);
+        }}
+      />
 
       {/* Windows 11 Mini Tray Floating Widget */}
       <TrayMiniWidget />

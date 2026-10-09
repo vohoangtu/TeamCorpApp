@@ -20,13 +20,32 @@ import type {
   MeshNode,
   MeshConfig,
   MeshAuditLog,
-  MeshRemoteNotification
+  MeshRemoteNotification,
+  TeamApiRequest,
+  TeamApiResponse,
+  MockRule,
+  HttpMethod
 } from '../types';
 import { type ThemeId, THEMES, THEME_LIST, applyThemeToDocument, getStoredThemeId } from '../themes';
 import { type MaterialType, MATERIALS, MATERIAL_LIST, applyMaterialToDocument, getStoredMaterialType } from '../materials';
 import { NotificationService } from '../utils/notifications';
 
 interface AppState {
+  // Pillar 7: Team API Runner & Smart Mock Engine
+  isTeamApiRunnerOpen: boolean;
+  activeApiRunnerProject: Project | null;
+  teamApiRequests: TeamApiRequest[];
+  mockRules: MockRule[];
+  setIsTeamApiRunnerOpen: (open: boolean) => void;
+  setActiveApiRunnerProject: (proj: Project | null) => void;
+  fetchTeamApiRequests: (projectId?: string) => Promise<void>;
+  saveTeamApiRequest: (req: Partial<TeamApiRequest> & { name: string; method: HttpMethod; endpoint: string; projectId: string }) => Promise<TeamApiRequest | null>;
+  deleteTeamApiRequest: (id: string) => Promise<boolean>;
+  executeTeamApiRequest: (opts: any) => Promise<TeamApiResponse | null>;
+  fetchMockRules: (projectId?: string) => Promise<void>;
+  saveMockRule: (rule: Partial<MockRule> & { name: string; endpointPattern: string; projectId: string }) => Promise<MockRule | null>;
+  deleteMockRule: (id: string) => Promise<boolean>;
+
   // Pillar 6: Team Mesh & Peer Discovery
   meshNodes: MeshNode[];
   activeNodeFilter: string;
@@ -241,6 +260,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsAnalyticsOpen: (open) => set({ isAnalyticsOpen: open }),
   setIsDockerFleetOpen: (open) => set({ isDockerFleetOpen: open }),
   setIsArchitectureGraphOpen: (open) => set({ isArchitectureGraphOpen: open }),
+  isTeamApiRunnerOpen: false,
+  activeApiRunnerProject: null,
+  teamApiRequests: [],
+  mockRules: [],
+  setIsTeamApiRunnerOpen: (open) => set({ isTeamApiRunnerOpen: open }),
+  setActiveApiRunnerProject: (proj) => set({ activeApiRunnerProject: proj }),
   setIsMiniMode: (open) => set({ isMiniMode: open }),
   setActiveEnvProject: (proj) => set({ activeEnvProject: proj }),
   setActiveCleanerProject: (proj) => set({ activeCleanerProject: proj }),
@@ -782,6 +807,112 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  fetchTeamApiRequests: async (projectId?: string) => {
+    try {
+      const url = projectId ? `/api/team-api/requests?projectId=${encodeURIComponent(projectId)}` : '/api/team-api/requests';
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        set({ teamApiRequests: data });
+      }
+    } catch (e) {
+      console.error('Fetch team API requests error', e);
+    }
+  },
+
+  saveTeamApiRequest: async (req) => {
+    try {
+      const res = await fetch('/api/team-api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        get().fetchTeamApiRequests();
+        return saved;
+      }
+    } catch (e) {
+      console.error('Save team API request error', e);
+    }
+    return null;
+  },
+
+  deleteTeamApiRequest: async (id: string) => {
+    try {
+      const res = await fetch(`/api/team-api/requests/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        get().fetchTeamApiRequests();
+        return true;
+      }
+    } catch (e) {
+      console.error('Delete team API request error', e);
+    }
+    return false;
+  },
+
+  executeTeamApiRequest: async (opts) => {
+    try {
+      const res = await fetch('/api/team-api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(opts),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        get().fetchTeamApiRequests();
+        return data;
+      }
+    } catch (e) {
+      console.error('Execute team API request error', e);
+    }
+    return null;
+  },
+
+  fetchMockRules: async (projectId?: string) => {
+    try {
+      const url = projectId ? `/api/team-api/mocks?projectId=${encodeURIComponent(projectId)}` : '/api/team-api/mocks';
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        set({ mockRules: data });
+      }
+    } catch (e) {
+      console.error('Fetch mock rules error', e);
+    }
+  },
+
+  saveMockRule: async (rule) => {
+    try {
+      const res = await fetch('/api/team-api/mocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rule),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        get().fetchMockRules();
+        return saved;
+      }
+    } catch (e) {
+      console.error('Save mock rule error', e);
+    }
+    return null;
+  },
+
+  deleteMockRule: async (id: string) => {
+    try {
+      const res = await fetch(`/api/team-api/mocks/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        get().fetchMockRules();
+        return true;
+      }
+    } catch (e) {
+      console.error('Delete mock rule error', e);
+    }
+    return false;
+  },
+
   connectWebSocket: () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -799,6 +930,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().fetchTeamCatalog();
         get().fetchMeshConfig();
         get().fetchMeshAuditLogs();
+        get().fetchTeamApiRequests();
+        get().fetchMockRules();
       };
 
       socket.onmessage = (event) => {
@@ -865,6 +998,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             NotificationService.notify(msg.payload.title, {
               body: msg.payload.message,
             });
+          } else if (msg.type === 'team_api:requests_updated') {
+            set({ teamApiRequests: msg.payload });
+          } else if (msg.type === 'team_api:mocks_updated') {
+            set({ mockRules: msg.payload });
           }
         } catch (e) {
           console.error('WS parse error', e);

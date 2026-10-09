@@ -25,7 +25,8 @@ import {
   Check,
   Share2,
   Wifi,
-  Globe
+  Globe,
+  Radio
 } from 'lucide-react';
 import type { Project } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -57,6 +58,8 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
     setActiveResourceInspectorProject,
     toggleProjectShare,
     triggerRemoteProjectAction,
+    setIsTeamApiRunnerOpen,
+    setActiveApiRunnerProject,
   } = useAppStore();
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -411,6 +414,18 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
                           <KeyRound className="h-3.5 w-3.5" />
                         </button>
 
+                        {/* Remote Action: Test API with P2P Runner & Postman */}
+                        <button
+                          onClick={() => {
+                            setActiveApiRunnerProject(project);
+                            setIsTeamApiRunnerOpen(true);
+                          }}
+                          className="fluent-icon-btn h-7 w-7 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10"
+                          title={`Thử nghiệm API của ${project.name} trên ${project.nodeName || 'Remote'} (P2P Postman & Mock)`}
+                        >
+                          <Radio className="h-3.5 w-3.5" />
+                        </button>
+
                         {/* Direct Web Opening */}
                         {project.remoteUrl && (
                           <a
@@ -517,6 +532,18 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects }) 
                                 >
                                   <KeyRound className="h-3.5 w-3.5 text-emerald-500" />
                                   <span>.env & Secrets Studio</span>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setActiveApiRunnerProject(project);
+                                    setIsTeamApiRunnerOpen(true);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs text-hub-primary hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+                                >
+                                  <Radio className="h-3.5 w-3.5 text-sky-500" />
+                                  <span>Team API Runner & Mock</span>
                                 </button>
 
                                 <button

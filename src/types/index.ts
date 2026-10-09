@@ -498,3 +498,56 @@ export interface MeshRemoteNotification {
   projectName: string;
 }
 
+// --- 📬 PILLAR 7: TEAM API RUNNER & SMART MOCK ENGINE ---
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export interface TeamApiRequest {
+  id: string;
+  name: string;
+  method: HttpMethod;
+  endpoint: string;
+  projectId: string;
+  projectName: string;
+  nodeId?: string;
+  nodeName?: string;
+  isRemote?: boolean;
+  headers?: Record<string, string>;
+  queryParams?: Record<string, string>;
+  body?: string;
+  authType?: 'none' | 'bearer' | 'basic';
+  authToken?: string;
+  description?: string;
+  createdAt: number;
+  updatedAt: number;
+  lastRunStatus?: number;
+  lastRunDurationMs?: number;
+}
+
+export interface TeamApiResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  data: any;
+  durationMs: number;
+  sizeBytes: number;
+  timestamp: string;
+  isMocked?: boolean;
+  mockRuleId?: string;
+  error?: string;
+}
+
+export interface MockRule {
+  id: string;
+  projectId: string;
+  projectName?: string;
+  name: string;
+  method: HttpMethod | 'ALL';
+  endpointPattern: string;
+  statusCode: number;
+  delayMs: number;
+  responseBody: string;
+  enabled: boolean;
+  mode: 'auto_when_offline' | 'always_mock';
+  createdAt: number;
+}
+

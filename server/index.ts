@@ -28,6 +28,8 @@ import { logAggregator } from './log-aggregator';
 import { gitMatrixService } from './git-matrix';
 import { windowsTuningService } from './windows-tuning';
 import { meshDiscovery } from './mesh-discovery';
+import { teamApiRunner } from './team-api-runner';
+import { mockEngine } from './mock-engine';
 import type { CreateProjectPayload, Project, LogEntry, ProcessPriority, MeshConfig, MeshAuditLog, TeamPortClash } from '../src/types';
 
 const PORT = 4100;
@@ -1268,6 +1270,73 @@ server.on('request', async (req, res) => {
       }
       res.writeHead(200);
       res.end(JSON.stringify(schema));
+      return;
+    }
+
+    // =========================================================================
+    // 📬 PILLAR 7: TEAM API RUNNER & SMART MOCK ENGINE (P2P POSTMAN CHO TEAM)
+    // =========================================================================
+    if (pathname === '/api/team-api/requests') {
+      if (method === 'GET') {
+        const projectId = parsedUrl.searchParams.get('projectId') || undefined;
+        const requests = teamApiRunner.getAllRequests(projectId);
+        res.writeHead(200);
+        res.end(JSON.stringify(requests));
+        return;
+      }
+      if (method === 'POST') {
+        const body = await parseBody<any>(req);
+        const saved = teamApiRunner.saveRequest(body);
+        broadcast('team_api:requests_updated', teamApiRunner.getAllRequests());
+        res.writeHead(200);
+        res.end(JSON.stringify(saved));
+        return;
+      }
+    }
+
+    const deleteRequestMatch = pathname.match(/^\/api\/team-api\/requests\/([^/]+)$/);
+    if (deleteRequestMatch && method === 'DELETE') {
+      const id = deleteRequestMatch[1];
+      const success = teamApiRunner.deleteRequest(id);
+      broadcast('team_api:requests_updated', teamApiRunner.getAllRequests());
+      res.writeHead(200);
+      res.end(JSON.stringify({ success }));
+      return;
+    }
+
+    if (pathname === '/api/team-api/execute' && method === 'POST') {
+      const body = await parseBody<any>(req);
+      const result = await teamApiRunner.execute(body);
+      res.writeHead(200);
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (pathname === '/api/team-api/mocks') {
+      if (method === 'GET') {
+        const projectId = parsedUrl.searchParams.get('projectId') || undefined;
+        const mocks = mockEngine.getAllRules(projectId);
+        res.writeHead(200);
+        res.end(JSON.stringify(mocks));
+        return;
+      }
+      if (method === 'POST') {
+        const body = await parseBody<any>(req);
+        const saved = mockEngine.saveRule(body);
+        broadcast('team_api:mocks_updated', mockEngine.getAllRules());
+        res.writeHead(200);
+        res.end(JSON.stringify(saved));
+        return;
+      }
+    }
+
+    const deleteMockMatch = pathname.match(/^\/api\/team-api\/mocks\/([^/]+)$/);
+    if (deleteMockMatch && method === 'DELETE') {
+      const id = deleteMockMatch[1];
+      const success = mockEngine.deleteRule(id);
+      broadcast('team_api:mocks_updated', mockEngine.getAllRules());
+      res.writeHead(200);
+      res.end(JSON.stringify({ success }));
       return;
     }
 
