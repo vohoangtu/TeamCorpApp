@@ -30,6 +30,7 @@ import { windowsTuningService } from './windows-tuning';
 import { meshDiscovery } from './mesh-discovery';
 import { teamApiRunner } from './team-api-runner';
 import { mockEngine } from './mock-engine';
+import { gitCollabService } from './git-collab';
 import type { CreateProjectPayload, Project, LogEntry, ProcessPriority, MeshConfig, MeshAuditLog, TeamPortClash } from '../src/types';
 
 const PORT = 4100;
@@ -1337,6 +1338,49 @@ server.on('request', async (req, res) => {
       broadcast('team_api:mocks_updated', mockEngine.getAllRules());
       res.writeHead(200);
       res.end(JSON.stringify({ success }));
+      return;
+    }
+
+    // =========================================================================
+    // 🛰️ GIT OVERLAP RADAR & ACTIVE BRANCH HEALTH BOARD
+    // =========================================================================
+    if (pathname === '/api/git-collab/status' && method === 'GET') {
+      const status = await gitCollabService.getLocalStatus();
+      res.writeHead(200);
+      res.end(JSON.stringify(status));
+      return;
+    }
+
+    if (pathname === '/api/git-collab/team-branches' && method === 'GET') {
+      const result = await gitCollabService.getTeamBranches();
+      res.writeHead(200);
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    if (pathname === '/api/git-collab/toggle-simulated' && method === 'POST') {
+      const body = await parseBody<{ enabled: boolean }>(req);
+      const isEnabled = gitCollabService.setSimulatedPeers(body.enabled !== false);
+      const result = await gitCollabService.getTeamBranches();
+      broadcast('git_collab:update', result);
+      res.writeHead(200);
+      res.end(JSON.stringify({ enabled: isEnabled }));
+      return;
+    }
+
+    if (pathname === '/api/git-collab/pre-pr-check' && method === 'POST') {
+      const body = await parseBody<{ repoPath?: string }>(req);
+      const report = await gitCollabService.runPrePRQualityGate(body?.repoPath);
+      res.writeHead(200);
+      res.end(JSON.stringify(report));
+      return;
+    }
+
+    if (pathname === '/api/git-collab/open-pr-url' && method === 'POST') {
+      const body = await parseBody<{ url: string }>(req);
+      gitCollabService.openGitHubPR(body.url);
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true }));
       return;
     }
 

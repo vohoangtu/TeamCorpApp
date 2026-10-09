@@ -551,3 +551,75 @@ export interface MockRule {
   createdAt: number;
 }
 
+// --- 🛰️ GIT OVERLAP RADAR & ACTIVE BRANCH HEALTH BOARD ---
+export type GitFileChangeStatus = 'modified' | 'added' | 'deleted' | 'untracked';
+
+export interface GitCollabFileItem {
+  path: string;
+  status: GitFileChangeStatus;
+  linesAdded?: number;
+  linesDeleted?: number;
+}
+
+export interface GitMemberCommit {
+  hash: string;
+  author: string;
+  message: string;
+  date: string;
+}
+
+export interface GitMemberStatus {
+  nodeId: string;
+  nodeName: string;
+  username: string;
+  hostname: string;
+  ip: string;
+  repoUrl: string;
+  repoName: string;
+  branch: string;
+  ahead: number;
+  behind: number;
+  uncommittedFiles: GitCollabFileItem[];
+  lastCommit?: GitMemberCommit;
+  isSelf: boolean;
+  isSimulated?: boolean;
+  updatedAt: number;
+}
+
+export interface GitOverlapItem {
+  id: string;
+  filePath: string;
+  localFile: GitCollabFileItem;
+  localBranch: string;
+  peerNodeId: string;
+  peerNodeName: string;
+  peerUsername: string;
+  peerBranch: string;
+  peerFile: GitCollabFileItem;
+  severity: 'critical' | 'warning';
+  recommendation: string;
+  detectedAt: number;
+}
+
+export interface PrePRCheckGate {
+  id: string;
+  title: string;
+  description: string;
+  status: 'passed' | 'failed' | 'warning' | 'running' | 'pending';
+  message: string;
+  details?: string[];
+  durationMs?: number;
+}
+
+export interface PrePRCheckResult {
+  projectName: string;
+  repoUrl: string;
+  branch: string;
+  targetBranch: string;
+  timestamp: string;
+  isReadyForPR: boolean;
+  gates: PrePRCheckGate[];
+  prCompareUrl?: string;
+  summary: string;
+}
+

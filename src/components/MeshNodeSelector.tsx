@@ -12,7 +12,8 @@ import {
   Check, 
   ChevronDown,
   KeyRound,
-  History 
+  History,
+  GitBranch
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import type { MeshNode } from '../types';
@@ -28,7 +29,10 @@ export const MeshNodeSelector: React.FC = () => {
     teamCatalog,
     setIsMeshSettingsOpen,
     setIsAuditModalOpen,
-    meshAuditLogs
+    meshAuditLogs,
+    isGitCollabRadarOpen,
+    setIsGitCollabRadarOpen,
+    gitOverlaps
   } = useAppStore();
 
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -131,6 +135,28 @@ export const MeshNodeSelector: React.FC = () => {
         >
           <KeyRound className="h-3.5 w-3.5 text-amber-500" />
           <span className="hidden sm:inline">Token & Quyền</span>
+        </button>
+
+        <button
+          onClick={() => setIsGitCollabRadarOpen(true)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-all shadow-2xs ${
+            gitOverlaps.length > 0
+              ? 'border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400 animate-pulse'
+              : 'border-hub bg-hub-card text-hub-secondary hover:text-hub-primary'
+          }`}
+          title="Mở Git Overlap Radar & Pre-PR Health Board (Ctrl+Shift+G)"
+        >
+          <GitBranch className="h-3.5 w-3.5 text-sky-500" />
+          <span>Git Radar</span>
+          {gitOverlaps.length > 0 ? (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-red-500 text-white font-bold">
+              {gitOverlaps.length} clash
+            </span>
+          ) : (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold">
+              0 clash
+            </span>
+          )}
         </button>
 
         <button

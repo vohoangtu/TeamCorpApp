@@ -16,7 +16,8 @@ import {
   Network,
   Sparkles,
   BarChart3,
-  Rocket
+  Rocket,
+  GitBranch
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { THEMES } from '../themes';
@@ -59,7 +60,9 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
     setIsAnalyticsOpen,
     setIsWorkspacesOpen,
     setActiveCopilot,
-    setIsNewProjectOpen
+    setIsNewProjectOpen,
+    setIsGitCollabRadarOpen,
+    gitOverlaps
   } = useAppStore();
 
   const currentThemeDef = THEMES[themeId] || THEMES['fluent-dark'];
@@ -146,12 +149,20 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
       shortcut: 'Ctrl+Shift+I'
     },
     {
+      id: 'gitradar',
+      label: 'Git Overlap Radar',
+      icon: GitBranch,
+      iconColor: gitOverlaps.length > 0 ? 'text-red-500 animate-pulse' : 'text-sky-500',
+      action: () => setIsGitCollabRadarOpen(true),
+      shortcut: 'Ctrl+Shift+G'
+    },
+    {
       id: 'topology',
       label: 'Architecture Topology',
       icon: Network,
       iconColor: 'text-indigo-500',
       action: () => setIsArchitectureGraphOpen(true),
-      shortcut: 'Ctrl+Shift+G'
+      shortcut: 'Topology'
     },
     {
       id: 'analytics',

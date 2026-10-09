@@ -24,13 +24,30 @@ import type {
   TeamApiRequest,
   TeamApiResponse,
   MockRule,
-  HttpMethod
+  HttpMethod,
+  GitMemberStatus,
+  GitOverlapItem,
+  PrePRCheckResult
 } from '../types';
 import { type ThemeId, THEMES, THEME_LIST, applyThemeToDocument, getStoredThemeId } from '../themes';
 import { type MaterialType, MATERIALS, MATERIAL_LIST, applyMaterialToDocument, getStoredMaterialType } from '../materials';
 import { NotificationService } from '../utils/notifications';
 
 interface AppState {
+  // Git Overlap Radar & Pre-PR Health Board
+  isGitCollabRadarOpen: boolean;
+  gitCollabStatus: GitMemberStatus | null;
+  gitCollabTeam: GitMemberStatus[];
+  gitOverlaps: GitOverlapItem[];
+  isSimulatedPeersEnabled: boolean;
+  prePRCheckResult: PrePRCheckResult | null;
+  isPrePRChecking: boolean;
+  setIsGitCollabRadarOpen: (open: boolean) => void;
+  fetchGitCollabTeam: () => Promise<void>;
+  toggleSimulatedPeers: (enabled: boolean) => Promise<void>;
+  runPrePRQualityGate: (repoPath?: string) => Promise<PrePRCheckResult | null>;
+  openGitHubPRUrl: (url: string) => Promise<void>;
+
   // Pillar 7: Team API Runner & Smart Mock Engine
   isTeamApiRunnerOpen: boolean;
   activeApiRunnerProject: Project | null;
@@ -211,6 +228,90 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActiveNodeFilter: (filter) => set({ activeNodeFilter: filter }),
   setIsAuditModalOpen: (open) => set({ isAuditModalOpen: open }),
   setIsMeshSettingsOpen: (open) => set({ isMeshSettingsOpen: open }),
+
+  // Git Overlap Radar & Pre-PR Health Board
+  isGitCollabRadarOpen: false,
+  gitCollabStatus: null,
+  gitCollabTeam: [],
+  gitOverlaps: [],
+  isSimulatedPeersEnabled: true,
+  prePRCheckResult: null,
+  isPrePRChecking: false,
+  setIsGitCollabRadarOpen: (open) => set({ isGitCollabRadarOpen: open }),
+
+  fetchGitCollabTeam: async () => {
+    try {
+      const res = await fetch('/api/git-collab/team-branches');
+      if (res.ok) {
+        const data = await res.json();
+        set({
+          gitCollabStatus: data.localStatus,
+          gitCollabTeam: data.team,
+          gitOverlaps: data.overlaps,
+          isSimulatedPeersEnabled: data.isSimulated,
+        });
+      }
+    } catch (e) {
+      console.error('Fetch git collab team error', e);
+    }
+  },
+
+  toggleSimulatedPeers: async (enabled) => {
+    try {
+      const res = await fetch('/api/git-collab/toggle-simulated', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      if (res.ok) {
+        get().fetchGitCollabTeam();
+      }
+    } catch (e) {
+      console.error('Toggle simulated peers error', e);
+    }
+  },
+
+  runPrePRQualityGate: async (repoPath?: string) => {
+    set({ isPrePRChecking: true, prePRCheckResult: null });
+    try {
+      const res = await fetch('/api/git-collab/pre-pr-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoPath }),
+      });
+      if (res.ok) {
+        const report = await res.json();
+        set({ prePRCheckResult: report, isPrePRChecking: false });
+        if (report.isReadyForPR) {
+          NotificationService.notify('✅ Pre-PR Quality Gate Passed', {
+            body: 'Mã nguồn vượt qua kiểm tra TypeCheck và Clean Working Tree!',
+          });
+        } else {
+          NotificationService.notify('⚠️ Pre-PR Quality Gate Warning', {
+            body: report.summary,
+          });
+        }
+        return report;
+      }
+    } catch (e) {
+      console.error('Run pre-pr check error', e);
+    } finally {
+      set({ isPrePRChecking: false });
+    }
+    return null;
+  },
+
+  openGitHubPRUrl: async (url: string) => {
+    try {
+      await fetch('/api/git-collab/open-pr-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+    } catch (e) {
+      console.error('Open GitHub PR error', e);
+    }
+  },
 
   projects: [],
   activeProjectId: null,
@@ -932,6 +1033,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().fetchMeshAuditLogs();
         get().fetchTeamApiRequests();
         get().fetchMockRules();
+        get().fetchGitCollabTeam();
       };
 
       socket.onmessage = (event) => {
@@ -1002,6 +1104,13 @@ export const useAppStore = create<AppState>((set, get) => ({
             set({ teamApiRequests: msg.payload });
           } else if (msg.type === 'team_api:mocks_updated') {
             set({ mockRules: msg.payload });
+          } else if (msg.type === 'git_collab:update') {
+            set({
+              gitCollabStatus: msg.payload.localStatus,
+              gitCollabTeam: msg.payload.team,
+              gitOverlaps: msg.payload.overlaps,
+              isSimulatedPeersEnabled: msg.payload.isSimulated,
+            });
           }
         } catch (e) {
           console.error('WS parse error', e);

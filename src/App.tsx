@@ -34,8 +34,9 @@ import { MeshNodeSelector } from './components/MeshNodeSelector';
 import { MeshAuditModal } from './components/MeshAuditModal';
 import { MeshSettingsModal } from './components/MeshSettingsModal';
 import { TeamApiRunnerModal } from './components/TeamApiRunnerModal';
+import { GitCollabRadarModal } from './components/GitCollabRadarModal';
 import { useAppStore } from './store/useAppStore';
-import { Plus, FolderGit2, Zap, Search, List, LayoutGrid, Radio } from 'lucide-react';
+import { Plus, FolderGit2, Zap, Search, List, LayoutGrid, Radio, GitBranch } from 'lucide-react';
 
 export const App: React.FC = () => {
   const { 
@@ -58,6 +59,10 @@ export const App: React.FC = () => {
     teamCatalog,
     fetchMeshNodes,
     fetchTeamCatalog,
+    isGitCollabRadarOpen,
+    setIsGitCollabRadarOpen,
+    gitOverlaps,
+    fetchGitCollabTeam,
     isPortRadarOpen,
     setIsPortRadarOpen,
     isWorkspacesOpen,
@@ -107,11 +112,12 @@ export const App: React.FC = () => {
     fetchProjects();
     fetchMeshNodes();
     fetchTeamCatalog();
+    fetchGitCollabTeam();
     const disconnect = connectWebSocket();
     return () => disconnect();
-  }, [fetchProjects, fetchMeshNodes, fetchTeamCatalog, connectWebSocket]);
+  }, [fetchProjects, fetchMeshNodes, fetchTeamCatalog, fetchGitCollabTeam, connectWebSocket]);
 
-  // Global Keyboard Shortcuts (Ctrl+K, Ctrl+Shift+T, Ctrl+Shift+S, Ctrl+Shift+P, Ctrl+Shift+W)
+  // Global Keyboard Shortcuts (Ctrl+K, Ctrl+Shift+T, Ctrl+Shift+S, Ctrl+Shift+P, Ctrl+Shift+W, Ctrl+Shift+G)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl + K (or Cmd + K): Focus Search Input
@@ -128,6 +134,11 @@ export const App: React.FC = () => {
       }
 
       if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
+        // Ctrl + Shift + G: Git Overlap Radar & Pre-PR Board
+        if (e.key.toLowerCase() === 'g') {
+          e.preventDefault();
+          setIsGitCollabRadarOpen(!isGitCollabRadarOpen);
+        }
         // Ctrl + Shift + T: Cycle Themes
         if (e.key.toLowerCase() === 't') {
           e.preventDefault();
@@ -420,6 +431,25 @@ export const App: React.FC = () => {
                     <span>API Runner</span>
                   </button>
 
+                  {/* Git Overlap Radar & Pre-PR Board */}
+                  <button
+                    onClick={() => setIsGitCollabRadarOpen(true)}
+                    className={`fluent-btn-standard flex h-8.5 items-center gap-1.5 px-2.5 text-[12.5px] font-semibold border transition-all shadow-xs ${
+                      gitOverlaps.length > 0
+                        ? 'text-red-600 dark:text-red-400 border-red-500/40 bg-red-500/10 hover:bg-red-500/20 animate-pulse'
+                        : 'text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20'
+                    }`}
+                    title="Cảnh báo trùng file đang sửa & Bảng Pre-PR Health (Ctrl+Shift+G)"
+                  >
+                    <GitBranch className="h-3.5 w-3.5" />
+                    <span>Git Radar</span>
+                    {gitOverlaps.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-red-500 text-white font-bold leading-none">
+                        {gitOverlaps.length}
+                      </span>
+                    )}
+                  </button>
+
                   {/* Primary Action Button: + Thêm ứng dụng */}
                   <button
                     onClick={() => setIsAddModalOpen(true)}
@@ -675,6 +705,9 @@ export const App: React.FC = () => {
           setActiveApiRunnerProject(null);
         }}
       />
+
+      {/* Git Overlap Radar & Pre-PR Health Board Modal */}
+      <GitCollabRadarModal />
 
       {/* Windows 11 Mini Tray Floating Widget */}
       <TrayMiniWidget />
